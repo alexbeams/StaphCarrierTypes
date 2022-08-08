@@ -9,8 +9,11 @@ The simulation codes towards the end of the document are set up to use parameter
 The other most important files are the ones which define the log-likelihood models:
 
 getL_ih_markdown.R
+
 getL_2cr_markdown.R
+
 getL_2s_markdown.R
+
 getL_ucc_markdown.R
 
 the one which loads in/formats the data:
@@ -30,9 +33,13 @@ is necessary to perform the affine-invariant ensemble sampling scheme described 
 The codes
 
 getSims.R
+
 IHSim_gen.R 
+
 2CRSim_gen.R 
+
 UCCSim_gen.R 
+
 2SSim_gen.R 
 
 are needed to run simulations from the models.
