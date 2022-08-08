@@ -1,0 +1,2900 @@
+---
+title: "Staphylococcus aureus Carrier Types are not Evidence of Population Heterogeneity" 
+geometry: margin=1in
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    fig_width: 5
+    fig_height: 3.5
+  word_document: default
+---
+
+# S3.1 Data
+
+
+
+```{r,eval=TRUE, echo=FALSE,message=FALSE}
+library(knitr)
+
+
+#First, we load the data from Price et al (2017):
+
+#columns are different HCW, rows correspond to testing time. 2=MSSA positive, 1=MSSA negative, 0=no test
+
+source('dataLoader.R')
+```
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 7, fig.height = 10}
+#pdf(file='Figure1.pdf',width=7,height=10)
+
+par(mfrow=c(2,1),
+    omi=c(0,.5,.2,0),
+    mai=c(1,1,.5,0 )
+    ) #oma specifies outer margins, where figure labels "A" and "B", etc will go
+
+Positive <- apply(dat.mssa,1,function(x) sum(x==2))
+Negative <- apply(dat.mssa,1,function(x) sum(x==1))
+fig1dat <- t(data.frame(Positive,Negative))
+
+b <- barplot(fig1dat,
+        legend.text=TRUE,
+        args.legend=list(x=5.5,y=150,title=expression(underline(Result)),cex=1),
+        xlab='Week of Study',ylab='Number of Tests',
+        family='sans', #Arial font on Windows,
+        font=1,
+        axes=F,
+        space=0,
+        ylim=c(0,150))
+
+axis(side=1,at=c(b,17.5),labels=c(seq(0,56,by=4),''),pos=0) #pos dictates where the axis crosses the other
+axis(side=2,at=c(0,50,100,150),labels=c(0,50,100,150),pos=0,las=2) #las determines alignment of axis tick labels
+text(x=-3.75,y=170,label='A)',xpd=NA)
+
+hist(apply(dat.mssa,2,function(x) sum(x==2)/sum(x>0)),
+     xlab='Proportion of Tests Positive',
+     ylab='No. of Study Subjects',
+     main='',freq=TRUE,
+     font.main=1,
+     family='sans',
+     axes=F)
+axis(side=1,at=c(0:10)/10,labels=c(0:10)/10,pos=0)
+axis(side=2,at=seq(0,100,by=20) ,labels=seq(0,100,by=20) ,pos=0,las=2)
+
+text(x=-.25,y=100,label='B)',xpd=NA)
+
+#dev.off()
+```
+
+# S3.2 Maximum Likelihood Estimation
+
+
+```{r,eval=TRUE, echo=FALSE, message=FALSE}
+#Let's load the likelihood functions
+
+source('getL_ih_markdown.R')
+source('getL_2cr_markdown.R')
+source('getL_ucc_markdown.R')
+source('getL_2s_markdown.R')
+
+```
+
+
+```{r,eval=FALSE, echo=FALSE}
+#run this chunk to fit models with Maximum likelihood
+# Let's find the Maximum Likelihood Estimates for each model. We'll optimize from a good initial guess.
+
+obj.ih <- function(theta) -getLogLikelihood.ih(theta,list.mssa)
+opt.ih <- optim(thetaCurrent.ih,obj.ih,control=list(maxit=2000))
+
+obj.2cr <- function(theta) -getLogLikelihood.2cr(theta,list.mssa)
+opt.2cr <- optim(thetaCurrent.2cr,obj.2cr,control=list(maxit=2000))
+
+obj.2cr.base <- function(theta) -getLogLikelihood.2cr(c(theta[1:4],theta[5],theta[6],theta[5],theta[6]),list.mssa)
+opt.2cr.base <- optim(thetaCurrent.2cr[1:6],obj.2cr.base,control=list(maxit=2000))
+
+obj.ucc <- function(theta) -getLogLikelihood.ucc(theta,list.mssa)
+opt.ucc <- optim(thetaCurrent.ucc,obj.ucc,control=list(maxit=2000))
+
+obj.2s <- function(theta) -getLogLikelihood.2s(theta,list.mssa)
+opt.2s <- optim(jitter(thetaCurrent.2s),obj.2s,control=list(maxit=2000))
+```
+
+```{r,eval=TRUE, echo=FALSE}
+#load in previously saved MLE
+load("opt_ih.Rdata")
+load("opt_2cr.Rdata")
+load("opt_ucc.Rdata")
+load("opt_2s.Rdata")
+
+load("opt_2cr_base.Rdata") #assumes sensitivity of both groups is equal
+```
+
+```{r,eval=TRUE, echo=FALSE}
+#format optim output
+ml.ih <- signif(-opt.ih$value,digits=4)
+alpha.mle.ih= signif( exp(opt.ih$par[1]), digits=3)
+gam.mle.ih = signif(exp(opt.ih$par[2]), digits=3)
+phi.mle.ih = signif(1/(1+exp(-opt.ih$par[3]) ), digits=3)
+psi.mle.ih = signif(1/(1+exp(-opt.ih$par[4]) ), digits=3)
+
+ml.2cr <- signif(-opt.2cr$value,digits=4)
+alpha.mle.2cr= signif(exp(opt.2cr$par[1]), digits=3)
+gamma1.mle.2cr = signif(exp(opt.2cr$par[2]), digits=3)
+gamma2.mle.2cr = signif(gamma1.mle.2cr/(1+ exp(-opt.2cr$par[3]) ), digits=3)
+sigma.mle.2cr = signif(1/(1+exp(-opt.2cr$par[4])), digits=3)
+phi1.mle.2cr = signif(1/(1+exp(-opt.2cr$par[5])), digits=3)
+psi1.mle.2cr = signif(1/(1+exp(-opt.2cr$par[6])), digits=3)
+phi2.mle.2cr = signif(1/(1+exp(-opt.2cr$par[7])), digits=3)
+psi2.mle.2cr = signif(1/(1+exp(-opt.2cr$par[8])), digits=3)
+
+ml.2cr.base <- signif(-opt.2cr.base$value,digits=4)
+alpha.mle.2cr.base= signif(exp(opt.2cr.base$par[1]), digits=3)
+gamma1.mle.2cr.base = signif(exp(opt.2cr.base$par[2]), digits=3)
+gamma2.mle.2cr.base = signif(gamma1.mle.2cr.base/(1+ exp(-opt.2cr.base$par[3]) ), digits=3)
+sigma.mle.2cr.base = signif(1/(1+exp(-opt.2cr.base$par[4])), digits=3)
+phi.mle.2cr.base = signif(1/(1+exp(-opt.2cr.base$par[5])), digits=3)
+psi.mle.2cr.base = signif(1/(1+exp(-opt.2cr.base$par[6])), digits=3)
+
+
+
+ml.ucc <- signif(-opt.ucc$value,digits=4)
+alpha.mle.ucc = signif(exp(opt.ucc$par[4]), digits=3)
+rhoEU = signif(exp(opt.ucc$par[5]), digits=3)
+rhoEC = signif(exp(opt.ucc$par[6]), digits=3)
+tau.mle.ucc <- signif(rhoEU+rhoEC, digits=3)
+p.mle.ucc <-signif( rhoEC/tau.mle.ucc, digits=3)
+gamma.mle.ucc =signif( exp(opt.ucc$par[7]), digits=3)
+psiU.mle.ucc = signif(1/(1+exp(-opt.ucc$par[1])), digits=3)
+phiE.mle.ucc = signif(1/(1+exp(-opt.ucc$par[2])), digits=3)
+phiC.mle.ucc =signif( 1/(1+exp(-opt.ucc$par[3])), digits=3)
+
+ml.2s <- signif(-opt.2s$value,digits=4)
+alpha1.mle.2s = signif(exp(opt.2s$par[4]),digits=3)
+alpha2.mle.2s = signif(exp(opt.2s$par[5]),digits=3)
+gamma1.mle.2s = signif(exp(opt.2s$par[6]),digits=3)
+gamma2.mle.2s = signif(exp(opt.2s$par[7]),digits=3)
+psiU.mle.2s = signif(1/(1+exp(-opt.2s$par[1])),digits=3)
+phiC1.mle.2s = signif(1/(1+exp(-opt.2s$par[2])),digits=3)
+phiC2.mle.2s = signif(1/(1+exp(-opt.2s$par[3])),digits=3)
+```
+
+Maximum Likelihood Estimates for carriage duration and colonization prevalence, found using optim():
+
+```{r,eval=TRUE, echo=FALSE}
+getDuration.ih <- function(gam) 1/gam 
+getDuration.2cr <- function(alpha,gam1,gam2,sig){
+  sig*(alpha+gam2)/(sig*(alpha+gam2) + (1-sig)*(alpha+gam1))/gam1 + (1-sig)*(alpha+gam1)/(sig*(alpha+gam2) + (1-sig)*(alpha+gam1))/gam2
+}
+getDuration.ucc <- function(alpha,gam,tau,p){
+  (tau*(tau+2*gam)*p + gam^2)/((p*tau+gam)*tau*(1-p)*gam)
+}
+
+
+getDuration.2s <- function(alpha1,alpha2,gamma1,gamma2){
+  alpha1*gamma2/(alpha1*gamma2+alpha2*gamma1)/gamma1 + alpha2*gamma1/(alpha1*gamma2+alpha2*gamma1)/gamma2
+}
+
+duration.mle.ih <- round( getDuration.ih(gam.mle.ih), digits=4)
+duration.mle.2cr <- round( getDuration.2cr(alpha.mle.2cr,gamma1.mle.2cr,gamma2.mle.2cr,sigma.mle.2cr), digits=4)
+duration.mle.ucc <- round( getDuration.ucc(alpha.mle.ucc,gamma.mle.ucc,tau.mle.ucc,p.mle.ucc), digits=4)
+duration.mle.2s <- round( getDuration.2s(alpha1.mle.2s,alpha2.mle.2s,gamma1.mle.2s,gamma2.mle.2s), digits=4)
+
+
+getPrevalence.ih <- function(alpha,gam) alpha/(alpha+gam)
+getPrevalence.2cr <- function(alpha,gam1,gam2,sig) sig*alpha/(alpha+gam1) + (1-sig)*alpha/(alpha+gam2)
+getPrevalence.ucc <- function(alpha,gam,tau,p) {(alpha*gam + alpha*p*tau)/(alpha*gam + alpha*p*tau + tau*gam*(1-p))}
+getPrevalence.2s <- function(alpha1,alpha2,gamma1,gamma2){(alpha1*gamma2+alpha2*gamma1)/(gamma1*gamma2+alpha1*gamma2+alpha2*gamma1)}
+
+prevalence.mle.ih <- round( getPrevalence.ih(alpha.mle.ih,gam.mle.ih),digits=2)
+prevalence.mle.2cr <-round(  getPrevalence.2cr(alpha.mle.2cr,gamma1.mle.2cr,gamma2.mle.2cr,sigma.mle.2cr),digits=2)
+prevalence.mle.ucc <- round( getPrevalence.ucc(alpha.mle.ucc,gamma.mle.ucc,tau.mle.ucc,p.mle.ucc),digits=2)
+prevalence.mle.2s <- round( getPrevalence.2s(alpha1.mle.2s,alpha2.mle.2s,gamma1.mle.2s,gamma2.mle.2s),digits=2)
+
+aic.ih <- -2*ml.ih + 8
+aic.2cr <- -2*ml.2cr + 16
+aic.ucc <- -2*ml.ucc + 14
+
+aic.2s <- -2*ml.2s + 14
+  
+dat.mle <- data.frame(
+  c(duration.mle.ih,duration.mle.2cr,duration.mle.2s,duration.mle.ucc),
+  c(prevalence.mle.ih,prevalence.mle.2cr,prevalence.mle.2s,prevalence.mle.ucc),     
+  c(ml.ih,ml.2cr,ml.2s,ml.ucc),c(aic.ih,aic.2cr,aic.2s,aic.ucc)
+  )
+rownames(dat.mle) <- c('IH','2CR','2S','UCC')
+colnames(dat.mle) <- c('Carriage Duration (wks)','Colonization Prevalence','Maximum Likelihood','AIC')
+dat.mle$`Carriage Duration (wks)` <- format(dat.mle$`Carriage Duration (wks)`,digits=4,nsmall=0)
+dat.mle$`Colonization Prevalence` <- format(dat.mle$`Colonization Prevalence`,digits=2,nsmall=0)
+dat.mle$`Maximum Likelihood` <- format(dat.mle$`Maximum Likelihood`,digits=5,nsmall=0)
+dat.mle$`AIC` <- format(dat.mle$`AIC`,digits=6,nsmall=0)
+
+kable(dat.mle)
+
+dat.mle.ih <- data.frame(alpha.mle.ih,gam.mle.ih,phi.mle.ih,psi.mle.ih)
+colnames(dat.mle.ih) <- c('$\\alpha$','$\\gamma$','$\\phi$','$\\psi$')
+dat.mle.ih <- format(dat.mle.ih,digits=3,nsmall=0)
+
+dat.mle.2cr <- data.frame(alpha.mle.2cr,gamma1.mle.2cr,gamma2.mle.2cr,sigma.mle.2cr,phi1.mle.2cr,psi1.mle.2cr,phi2.mle.2cr,psi2.mle.2cr)
+colnames(dat.mle.2cr) <- c('$\\alpha$','$\\gamma_1$','$\\gamma_2$','$\\sigma$','$\\phi_1$', '$\\psi_1$','$\\phi_2$', '$\\psi_2$')
+dat.mle.2cr <- format(dat.mle.2cr,digits=3,nsmall=0)
+
+dat.mle.ucc <- data.frame(alpha.mle.ucc,tau.mle.ucc,gamma.mle.ucc,p.mle.ucc,psiU.mle.ucc,phiE.mle.ucc,phiC.mle.ucc)
+colnames(dat.mle.ucc) <- c('$\\alpha$','$\\tau$','$\\gamma$','$p$','$\\psi_U$', '$\\phi_1$','$\\phi_2$')
+dat.mle.ucc <- format(dat.mle.ucc,digits=3,nsmall=0)
+
+dat.mle.2s <- data.frame(alpha1.mle.2s,alpha2.mle.2s,gamma1.mle.2s,gamma2.mle.2s,psiU.mle.2s,phiC1.mle.2s,phiC2.mle.2s)
+colnames(dat.mle.2s) <- c('$\\alpha_1$','$\\alpha_2$','$\\gamma_1$','$\\gamma_2$','$\\psi_U$', '$\\phi_C_1$','$\\phi_C_2$')
+dat.mle.2s <- format(dat.mle.2s,digits=3,nsmall=0)
+```
+
+Parameter MLE for Identical Hosts:
+```{r,eval=TRUE,echo=FALSE}
+kable(cbind('IH'=c(''),dat.mle.ih))
+```
+
+Parameter MLE for 2CR:
+```{r,eval=TRUE,echo=FALSE}
+kable(dat.mle.2cr)
+
+```
+
+Parameter MLE for 2S:
+```{r,eval=TRUE,echo=FALSE}
+kable(dat.mle.2s)
+```
+
+Parameter MLE for UCC:
+```{r,eval=TRUE,echo=FALSE}
+kable(dat.mle.ucc)
+```
+
+
+The sensitivities and specificities are fairly high:
+
+```{r,eval=TRUE,echo=FALSE}
+testProbs.mle <- data.frame(
+  c(phi.mle.ih,paste(phi1.mle.2cr,'/',phi2.mle.2cr),paste(phiC1.mle.2s,'/',phiC2.mle.2s),paste(phiE.mle.ucc,'/',phiC.mle.ucc)),
+  c(psi.mle.ih,paste(psi1.mle.2cr,'/',psi2.mle.2cr),psiU.mle.2s,psiU.mle.ucc))
+colnames(testProbs.mle) <- c('Sensitivity','Specificity')
+rownames(testProbs.mle) <- c('IH','2CR (Subpopulation 1/2)', '2S (Strain 1/2)','UCC (Contaminated/Colonized)')
+
+  
+kable(testProbs.mle)
+
+```
+
+The Identical Hosts model is nested within the other models. The asymptotic chi-square approximation to the Generalized Likelihood Ratio Test lends the most support to the UCC model as an alternative. Indeed, when constraining the 2CR model to have identical sensitivity/specificity for each subpopulation (so heterogeneity only manifests in carriage duration), the p-value for that comparison rises above 0.1.
+
+```{r,eval=TRUE,echo=FALSE}
+lambda.ih.2cr <- round(-2*(ml.ih-ml.2cr), digits=2)
+lambda.ih.2cr.base <- round(-2*(ml.ih-ml.2cr.base), digits=2)
+lambda.ih.2s <- round(-2*(ml.ih-ml.2s), digits=2)
+lambda.ih.ucc <- round(-2*(ml.ih-ml.ucc), digits=2)
+p.ih.2cr <- round( 1-pchisq(lambda.ih.2cr,df=4), digits=2)
+p.ih.2cr.base <- round(1-pchisq(lambda.ih.2cr.base,df=2), digits=2)
+p.ih.2s <- round(1-pchisq(lambda.ih.2s,df=3), digits=2)
+p.ih.ucc <- round(1-pchisq(lambda.ih.ucc,df=3), digits=2)
+dat.likelihood.ratio <- data.frame(c( lambda.ih.2cr,lambda.ih.2cr.base,lambda.ih.2s,lambda.ih.ucc), c(4,2,3,3), c(p.ih.2cr,p.ih.2cr.base,p.ih.2s,p.ih.ucc))
+colnames(dat.likelihood.ratio) <- c('GLR Test Statistic','Degrees of Freedom','Asymptotic Chi-Square P-Value')
+rownames(dat.likelihood.ratio) <- c('2CR-Heterogeneous Sensitivity/Specificity','2CR-Homogeneous Sensitivity/Specificity', '2S','UCC')
+kable(dat.likelihood.ratio)
+```
+
+## S3.2.1 Freely estimate importation probabilities
+Freely estimating the importation probability (as opposed to setting it equal to the estimated colonization prevalence) has little effect on the IH or 2CR models, but lowers the estimate for prevalence in the 2S and UCC model (and shortens estimated carriage duration.)
+```{r,eval=FALSE, echo=FALSE}
+source('getL_ih__importation_markdown.R')
+source('getL_2cr_importation_markdown.R')
+source('getL_ucc_importation_markdown.R')
+source('getL_2s_importation_markdown.R')
+
+
+obj.ih.importation <- function(theta) -getLogLikelihood.ih.importation(theta,list.mssa)
+opt.ih.importation <- optim(thetaCurrent.ih.importation,obj.ih.importation,control=list(maxit=2000))
+#save(opt.ih.importation,file='opt_ih_importation.Rdata')
+
+obj.2cr.importation <- function(theta) -getLogLikelihood.2cr.importation(theta,list.mssa)
+opt.2cr.importation <- optim(thetaCurrent.2cr.importation,obj.2cr.importation,control=list(maxit=2000))
+#save(opt.2cr.importation,file='opt_2cr_importation.Rdata')
+
+obj.ucc.importation <- function(theta) -getLogLikelihood.ucc.importation(theta,list.mssa)
+opt.ucc.importation <- optim(thetaCurrent.ucc.importation,obj.ucc.importation,control=list(maxit=2000))
+#save(opt.ucc.importation,file='opt_ucc_importation.Rdata')
+
+obj.2s.importation <- function(theta) -getLogLikelihood.2s.importation(theta,list.mssa)
+opt.2s.importation <- optim(thetaCurrent.2s.importation,obj.2s.importation,control=list(maxit=2000))
+#save(opt.2s.importation,file='opt_2s_importation.Rdata')
+
+```
+
+```{r,eval=TRUE, echo=FALSE}
+#load in previously saved optim output
+load("opt_ih_importation.Rdata")
+load("opt_2cr_importation.Rdata")
+load("opt_ucc_importation.Rdata")
+load("opt_2s_importation.Rdata")
+```
+
+```{r,eval=TRUE, echo=FALSE}
+#format optim output for MLE with importaion a free parameter
+ml.ih.importation <- round( -opt.ih.importation$value,digits=2)
+alpha.mle.ih.importation= round( exp(opt.ih.importation$par[1]), digits=10)
+gam.mle.ih.importation = round( exp(opt.ih.importation$par[2]), digits=10)
+phi.mle.ih.importation = round( 1/(1+exp(-opt.ih.importation$par[3]) ), digits=2)
+psi.mle.ih.importation = round( 1/(1+exp(-opt.ih.importation$par[4]) ), digits=2)
+pc.mle.ih.importation = round( 1-1/(1+exp(-opt.ih.importation$par[5])), digits=2)
+
+ml.2cr.importation <- round( -opt.2cr.importation$value,digits=2)
+alpha.mle.2cr.importation= round( exp(opt.2cr.importation$par[1]), digits=10)
+gamma1.mle.2cr.importation = round( exp(opt.2cr.importation$par[2]), digits=10)
+gamma2.mle.2cr.importation = round( gamma1.mle.2cr.importation/(1+ exp(-opt.2cr.importation$par[3]) ), digits=10)
+sigma.mle.2cr.importation = round( 1/(1+exp(-opt.2cr.importation$par[4])), digits=2)
+phi1.mle.2cr.importation = round( 1/(1+exp(-opt.2cr.importation$par[5])), digits=2)
+psi1.mle.2cr.importation = round( 1/(1+exp(-opt.2cr.importation$par[6])), digits=2)
+phi2.mle.2cr.importation = round( 1/(1+exp(-opt.2cr.importation$par[7])), digits=2)
+psi2.mle.2cr.importation = round( 1/(1+exp(-opt.2cr.importation$par[8])), digits=2)
+pc1.mle.2cr.importation = round( 1- 1/(1+exp(-opt.2cr.importation$par[9])), digits=2)
+pc2.mle.2cr.importation = round( 1- 1/(1+exp(-opt.2cr.importation$par[10])), digits=2)
+
+
+ml.ucc.importation <- round( -opt.ucc.importation$value,digits=2)
+alpha.mle.ucc.importation = round( exp(opt.ucc.importation$par[4]), digits=10)
+rhoEU = round( exp(opt.ucc.importation$par[5]), digits=10)
+rhoEC = round( exp(opt.ucc.importation$par[6]), digits=10)
+tau.mle.ucc.importation <- round( rhoEU+rhoEC, digits=10)
+p.mle.ucc.importation <- round( rhoEC/tau.mle.ucc.importation, digits=2)
+gamma.mle.ucc.importation = round( exp(opt.ucc.importation$par[7]), digits=2)
+psiU.mle.ucc.importation = round( 1/(1+exp(-opt.ucc.importation$par[1])), digits=2)
+phiE.mle.ucc.importation = round( 1/(1+exp(-opt.ucc.importation$par[2])), digits=2)
+phiC.mle.ucc.importation = round( 1/(1+exp(-opt.ucc.importation$par[3])), digits=2)
+pc.mle.ucc.importation = round( 1/(1+exp(-opt.ucc.importation$par[8])), digits=2)
+pcc.mle.ucc.importation = round( 1/(1+exp(-opt.ucc.importation$par[9])), digits=2)
+
+ml.2s.importation <- signif( -opt.2s.importation$value,digits=2)
+alpha1.mle.2s.importation = signif( exp(opt.2s.importation$par[4]), digits=3)
+alpha2.mle.2s.importation = signif( exp(opt.2s.importation$par[5]), digits=3)
+gamma1.mle.2s.importation = signif( exp(opt.2s.importation$par[6]), digits=3)
+gamma2.mle.2s.importation = signif( exp(opt.2s.importation$par[7]), digits=3)
+psiU.mle.2s.importation = signif( 1/(1+exp(-opt.2s.importation$par[1])), digits=3)
+phiC1.mle.2s.importation = signif( 1/(1+exp(-opt.2s.importation$par[2])), digits=3)
+phiC2.mle.2s.importation = signif( 1/(1+exp(-opt.2s.importation$par[3])), digits=3)
+pi2.mle.2s.importation = signif( 1/(1+exp(-opt.2s.importation$par[8])), digits=3)
+pi3.mle.2s.importation = signif( 1/(1+exp(-opt.2s.importation$par[9])), digits=3)
+```
+
+```{r,eval=TRUE,echo=FALSE}
+duration.mle.ih.importation <- round( getDuration.ih(gam.mle.ih.importation), digits=2)
+duration.mle.2cr.importation <- round( getDuration.2cr(alpha.mle.2cr.importation,gamma1.mle.2cr.importation,gamma2.mle.2cr.importation,sigma.mle.2cr.importation), digits=2)
+duration.mle.ucc.importation <- round( getDuration.ucc(alpha.mle.ucc.importation,gamma.mle.ucc.importation,tau.mle.ucc.importation,p.mle.ucc.importation), digits=2)
+
+duration.mle.2s.importation <- round(getDuration.2s(alpha1.mle.2s.importation,alpha2.mle.2s.importation,gamma1.mle.2s.importation,gamma2.mle.2s.importation),digits=2)
+
+prevalence.mle.ih.importation <- round( getPrevalence.ih(alpha.mle.ih.importation,gam.mle.ih.importation), digits=2)
+prevalence.mle.2cr.importation <- round( getPrevalence.2cr(alpha.mle.2cr.importation,gamma1.mle.2cr.importation,gamma2.mle.2cr.importation,sigma.mle.2cr.importation), digits=2)
+prevalence.mle.ucc.importation <- round( getPrevalence.ucc(alpha.mle.ucc.importation,gamma.mle.ucc.importation,tau.mle.ucc.importation,p.mle.ucc.importation), digits=2)
+prevalence.mle.2s.importation <- round(getPrevalence.2s(alpha1.mle.2s.importation,alpha2.mle.2s.importation,gamma1.mle.2s.importation,gamma2.mle.2s.importation),digits=2)
+
+aic.ih.importation <- round( -2*ml.ih.importation + 10, digits=2)
+aic.2cr.importation <- round( -2*ml.2cr.importation + 20, digits=2)
+aic.2s.importation <- round( -2*ml.2s.importation + 18, digits=2)
+aic.ucc.importation <- round( -2*ml.ucc.importation + 18, digits=2)
+  
+dat.mle.importation <-  data.frame(c(duration.mle.ih.importation,duration.mle.2cr.importation,duration.mle.2s.importation,duration.mle.ucc.importation),c(prevalence.mle.ih.importation,prevalence.mle.2cr.importation,prevalence.mle.2s.importation,prevalence.mle.ucc.importation),c(pc.mle.ih.importation,sigma.mle.2cr.importation*pc1.mle.2cr.importation+(1-sigma.mle.2cr.importation)*pc2.mle.2cr.importation, pi2.mle.2s.importation+pi3.mle.2s.importation,  pc.mle.ucc.importation),c(ml.ih.importation,ml.2cr.importation,ml.2s.importation,ml.ucc.importation),c(aic.ih.importation,aic.2cr.importation,aic.2s.importation,aic.ucc.importation))
+rownames(dat.mle.importation) <-  c('IH','2CR','2S','UCC')
+colnames(dat.mle.importation) <- c('Carriage Duration (wks)','Colonization Prevalence','Importation probability','Maximum Likelihood','AIC')
+library(knitr)
+kable(dat.mle.importation)
+```
+
+## S3.2.2 Assume perfect specificity
+
+```{r,eval=FALSE, echo=FALSE}
+obj.ih.perfspec <- function(theta) -getLogLikelihood.ih(c(theta[1],theta[2],theta[3],100),list.mssa)
+opt.ih.perfspec <- optim(thetaCurrent.ih[1:3],obj.ih.perfspec,control=list(maxit=2000))
+
+obj.2cr.perfspec <- function(theta) -getLogLikelihood.2cr(c(theta[1],theta[2],theta[3],theta[4],theta[5],theta[6],100,100),list.mssa)
+opt.2cr.perfspec <- optim(thetaCurrent.2cr[1:6],obj.2cr.perfspec,control=list(maxit=2000))
+
+obj.ucc.perfspec <- function(theta) -getLogLikelihood.ucc(c(100,theta[1],theta[2],theta[3],theta[4],theta[5],theta[6]),list.mssa)
+opt.ucc.perfspec <- optim(thetaCurrent.ucc[-1],obj.ucc.perfspec,control=list(maxit=2000))
+
+obj.2s.perfspec <- function(theta) -getLogLikelihood.2s(c(100,theta[1],theta[2],theta[3],theta[4],theta[5],theta[6]),list.mssa)
+opt.2s.perfspec <- optim(thetaCurrent.2s[-1],obj.2s.perfspec,control=list(maxit=2000))
+
+#save(opt.ih.perfspec,file='opt_ih_perfspec.Rdata')
+#save(opt.2cr.perfspec,file='opt_2cr_perfspec.Rdata')
+#save(opt.ucc.perfspec,file='opt_ucc_perfspec.Rdata')
+#save(opt.2s.perfspec,file='opt_2s_perfspec.Rdata')
+```
+
+```{r,eval=TRUE, echo=FALSE}
+#load in previously saved optim output for the perfect specificty models
+load('opt_ih_perfspec.Rdata')
+load('opt_2cr_perfspec.Rdata')
+load('opt_2s_perfspec.Rdata')
+load('opt_ucc_perfspec.Rdata')
+```
+
+```{r,eval=TRUE, echo=FALSE}
+ml.ih.perfspec <- round(-opt.ih.perfspec$value,digits=2)
+alpha.mle.ih.perfspec= exp(opt.ih.perfspec$par[1])
+gam.mle.ih.perfspec = exp(opt.ih.perfspec$par[2])
+phi.mle.ih.perfspec = round(1/(1+exp(-opt.ih.perfspec$par[3]) ),digits=2)
+
+ml.2cr.perfspec <- round(-opt.2cr.perfspec$value,digits=2)
+alpha.mle.2cr.perfspec= exp(opt.2cr.perfspec$par[1])
+gamma1.mle.2cr.perfspec = exp(opt.2cr.perfspec$par[2])
+gamma2.mle.2cr.perfspec = gamma1.mle.2cr.perfspec/(1+ exp(-opt.2cr.perfspec$par[3]) )
+sigma.mle.2cr.perfspec = round(1/(1+exp(-opt.2cr.perfspec$par[4])),digits=2)
+phi1.mle.2cr.perfspec = round(1/(1+exp(-opt.2cr.perfspec$par[5])),digits=2)
+phi2.mle.2cr.perfspec = round(1/(1+exp(-opt.2cr.perfspec$par[6])),digits=2)
+
+
+ml.ucc.perfspec <- round(-opt.ucc.perfspec$value,digits=2)
+alpha.mle.ucc.perfspec = exp(opt.ucc.perfspec$par[3])
+rhoEU.mle.ucc.perfspec = exp(opt.ucc.perfspec$par[4])
+rhoEC.mle.ucc.perfspec = exp(opt.ucc.perfspec$par[5])
+tau.mle.ucc.perfspec <- rhoEU.mle.ucc.perfspec+rhoEC.mle.ucc.perfspec
+p.mle.ucc.perfspec <- round(rhoEC.mle.ucc.perfspec/tau.mle.ucc.perfspec,digits=2)
+gamma.mle.ucc.perfspec = exp(opt.ucc.perfspec$par[6])
+phiE.mle.ucc.perfspec = round(1/(1+exp(-opt.ucc.perfspec$par[1])),digits=2)
+phiC.mle.ucc.perfspec = round(1/(1+exp(-opt.ucc.perfspec$par[2])),digits=2)
+
+ml.2s.perfspec <- round(-opt.2s.perfspec$value,digits=2)
+alpha1.mle.2s.perfspec = exp(opt.2s.perfspec$par[3])
+alpha2.mle.2s.perfspec = exp(opt.2s.perfspec$par[4])
+gamma1.mle.2s.perfspec = exp(opt.2s.perfspec$par[5]) 
+gamma2.mle.2s.perfspec = exp(opt.2s.perfspec$par[6])
+#psiU.mle.2s.perfspec = 1/(1+exp(-opt.2s.perfspec$par[1]))
+phiC1.mle.2s.perfspec = 1/(1+exp(-opt.2s.perfspec$par[1]))
+phiC2.mle.2s.perfspec = 1/(1+exp(-opt.2s.perfspec$par[2]))
+```
+
+```{r,eval=TRUE, echo=FALSE}
+duration.mle.ih.perfspec <- round( getDuration.ih(gam.mle.ih.perfspec), digits=2)
+duration.mle.2cr.perfspec <- round( getDuration.2cr(alpha.mle.2cr.perfspec,gamma1.mle.2cr.perfspec,gamma2.mle.2cr.perfspec,sigma.mle.2cr.perfspec), digits=2)
+duration.mle.ucc.perfspec <- round( getDuration.ucc(alpha.mle.ucc.perfspec,gamma.mle.ucc.perfspec,tau.mle.ucc.perfspec,p.mle.ucc.perfspec), digits=2)
+duration.mle.2s.perfspec <- round( getDuration.2s(alpha1.mle.2s.perfspec,alpha2.mle.2s.perfspec,gamma1.mle.2s.perfspec,gamma2.mle.2s.perfspec), digits=2)
+
+prevalence.mle.ih.perfspec <- round( getPrevalence.ih(alpha.mle.ih.perfspec,gam.mle.ih.perfspec), digits=2)
+prevalence.mle.2cr.perfspec <- round( getPrevalence.2cr(alpha.mle.2cr.perfspec,gamma1.mle.2cr.perfspec,gamma2.mle.2cr.perfspec,sigma.mle.2cr.perfspec), digits=2)
+prevalence.mle.ucc.perfspec <- round( getPrevalence.ucc(alpha.mle.ucc.perfspec,gamma.mle.ucc.perfspec,tau.mle.ucc.perfspec,p.mle.ucc.perfspec), digits=2)
+prevalence.mle.2s.perfspec <- round( getPrevalence.2s(alpha1.mle.2s.perfspec,alpha2.mle.2s.perfspec,gamma1.mle.2s.perfspec,gamma2.mle.2s.perfspec), digits=2)
+
+aic.ih.perfspec <- round( -2*ml.ih.perfspec + 6, digits=2)
+aic.2cr.perfspec <- round( -2*ml.2cr.perfspec + 14, digits=2)
+aic.2s.perfspec <- round( -2*ml.2s.perfspec + 12, digits=2)
+aic.ucc.perfspec <- round( -2*ml.ucc.perfspec + 12, digits=2)
+  
+dat.mle.perfspec <-  data.frame(c(duration.mle.ih.perfspec,duration.mle.2cr.perfspec,duration.mle.2s.perfspec,duration.mle.ucc.perfspec),c(prevalence.mle.ih.perfspec,prevalence.mle.2cr.perfspec,prevalence.mle.2s.perfspec,prevalence.mle.ucc.perfspec),c(ml.ih.perfspec,ml.2cr.perfspec,ml.2cr.perfspec,ml.ucc.perfspec),c(aic.ih.perfspec,aic.2cr.perfspec,aic.2s.perfspec,aic.ucc.perfspec))
+rownames(dat.mle.perfspec) <-  c('IH','2CR','2S','UCC')
+colnames(dat.mle.perfspec) <-  c('Carriage Duration (wks)','Colonization Prevalence','Maximum Likelihood','AIC')
+library(knitr)
+#kable(dat.mle.perfspec)
+```
+
+Ignoring false positives can produce drastically different estimates for carriage duration in the IH model, and can also affect prevalence estimates for the UCC model.
+
+```{r,eval=TRUE, echo=FALSE}
+
+#kable(dat.mle,caption='With False Positives')
+
+kable(dat.mle.perfspec, caption='Without False Positives')
+```
+
+# S3.3 Jackknife 
+
+We employ a jackknife scheme to assess the estimates' dependence on particular healthcare workers. In the figures to follow, the x-axis indicates which HCW has been omitted from the training data. HCW 1-32 tested positive every time, HCW 33-99 intermittently tested positive, and HCW 100-181 never tested positive. Within each of these groups, the HCW are ordered in terms of the number of times they were tested from high to low.
+
+## S3.3.1 Identical Hosts
+
+The middle group of scattered points correspond to leaving out HCW in the "intermittently test positive" group. The groups to the left or the right are the "always test positive" or "never test positive" groups.
+
+```{r,eval=FALSE, echo=FALSE}
+
+jackknife.dat.ih <- data.frame(matrix(nrow=length(list.mssa),ncol=(length(thetaCurrent.ih)+2) ))
+names(jackknife.dat.ih) <- c('log-likelihood','left-out-log-likelihood','alpha','gamma','psi','phi')
+jackknife.list.ih <- list.mssa
+njs <- length(list.mssa)
+for(i in 1:njs){
+  jdat <- jackknife.list.ih[-i]
+  obj.jackknife.ih <- function(theta) -getLogLikelihood.ih(theta,jdat)
+  opt.jackknife.ih <- optim(thetaCurrent.ih,obj.jackknife.ih,control=list(maxit=2000))
+  left.out.log.likelihood <- getLogLikelihood.ih(opt.jackknife.ih$par,jackknife.list.ih[i])
+  jackknife.dat.ih[i,] <- c(opt.jackknife.ih$value,left.out.log.likelihood,opt.jackknife.ih$par)
+}
+
+#save(jackknife.dat.ih,file='jackknife_dat_ih.Rdata')
+```
+
+```{r,eval=TRUE, echo=FALSE}
+load('jackknife_dat_ih.Rdata')
+```
+
+Clearly, people who intermittently test positive/negative provide the most information about the parameters. However, individuals who yield many positive tests at each also appear to inform the false positive probability: 
+
+```{r,eval=TRUE, echo=FALSE,fig.height = 3, fig.width = 12}
+par(mfrow=c(1,4))
+labsiz <- 2
+axsiz <- 1.8
+plot(exp(jackknife.dat.ih$alpha),ylab=bquote(alpha),xlab='HCW omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(exp(jackknife.dat.ih$gamma),ylab=bquote(gamma),xlab='HCW omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.ih$psi)),ylab=bquote(phi),xlab='HCW omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.ih$phi)),ylab=bquote(psi),xlab='HCW omitted',cex.axis=axsiz,cex.lab=labsiz)
+```
+
+Omitting people in the "always positive" group (HCW 1-32) elevates the estimated acquisition rate, $\hat{\alpha}$, and the specificity, $\hat{\psi}$. Intuitively, a greater share of colonized individuals in the data is consistent with more transmission, and a high specificity is required to explain the large number of individuals consistently testing negative every time (with so many tests, a false positive is more likely to occur). On the other hand, omitting people in the "always negative" group elevates the estimated clearance rate $\hat{\gamma}$ and reduces sensitivity, $\hat{\phi}$. Fewer long-term colonizations in the data would be consistent with a faster clearance rate, and a high sensitivity is required to explain individuals testing positive each time (with more tests, a false negative is more likely to occur).
+
+
+```{r,eval=TRUE, echo=FALSE,,fig.height = 3, fig.width = 13}
+par(mfrow=c(1,4))
+par(mar=c(5, 7, 4, 2) + 0.1)
+plot(-jackknife.dat.ih$'log-likelihood',ylab='Log-Likelihood:\n Training Data',xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+abline(v=32)
+abline(v=99)
+par(mar=c(5, 6, 4, 2) + 0.1)
+plot(jackknife.dat.ih$'left-out-log-likelihood',ylab='Log-Likelihood:\n Test Data',xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+abline(v=32)
+abline(v=99)
+
+```
+
+There is an apparent upward trend in likelihood as the number of tests decreases for people in the "never" category on the right, and the "always" category on the left.
+
+## S3.3.2 2 Clearance Rates
+
+```{r,eval=FALSE, echo=FALSE}
+
+jackknife.dat.2cr <- data.frame(matrix(nrow=length(list.mssa),ncol=(length(thetaCurrent.2cr)+2) ))
+names(jackknife.dat.2cr) <- c('log-likelihood','left-out-log-likelihood','alpha','gamma1','gamma2','sigma','phi1','psi1','phi2','psi2')
+jackknife.list.2cr <- list.mssa
+njs <- length(list.mssa)
+for(i in 1:njs){
+  jdat <- jackknife.list.2cr[-i]
+  obj.jackknife.2cr <- function(theta) -getLogLikelihood.2cr(theta,jdat)
+  opt.jackknife.2cr <- optim(thetaCurrent.2cr,obj.jackknife.2cr,control=list(maxit=2000))
+  left.out.log.likelihood <- getLogLikelihood.2cr(opt.jackknife.2cr$par,jackknife.list.2cr[i])
+  jackknife.dat.2cr[i,] <- c(opt.jackknife.2cr$value,left.out.log.likelihood,opt.jackknife.2cr$par)
+}
+
+#save(jackknife.dat.2cr,file='jackknife_dat_2cr.Rdata')
+```
+
+```{r,eval=TRUE,echo=FALSE,message=FALSE}
+load('jackknife_dat_2cr.Rdata')
+```
+
+```{r,eval=TRUE, echo=FALSE,fig.height = 6, fig.width = 12}
+par(mfrow=c(2,4))
+xlabl<-'HCW Omitted'
+plot(exp(jackknife.dat.2cr$alpha),ylab=bquote(alpha),xlab=xlabl,cex.axis=axsiz,cex.lab=labsiz)
+plot(exp(jackknife.dat.2cr$gamma1),ylab=bquote(gamma[1]),xlab=xlabl,cex.axis=axsiz,cex.lab=labsiz)
+plot(c(exp(jackknife.dat.2cr$gamma1))/(1+exp(-jackknife.dat.2cr$gamma2)),ylab=bquote(gamma[2]),xlab=xlabl,cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.2cr$sigma)),ylab=bquote(sigma),xlab=xlabl,cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.2cr$psi1)),ylab=bquote(psi[1]),xlab=xlabl,cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.2cr$phi1)),ylab=bquote(phi[1]),xlab=xlabl,cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.2cr$psi2)),ylab=bquote(psi[2]),xlab=xlabl,cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.2cr$phi2)),ylab=bquote(phi[2]),xlab=xlabl,cex.axis=axsiz,cex.lab=labsiz)
+```
+
+As for the IH model, HCW 100-181 yielded at least 14 consecutive negative tests. Omitting them results in reduced estimates of the clearance rates and the testing specificity for the predisposed group. It elevates the estimates for specificity in the less susceptible group, and increases the sensitivity estimates. Evidently, people who consistently yield negative tests inform the testing parameters, which informs the epidemiology parameters for the rest of the population.
+
+```{r,eval=TRUE,echo=FALSE,fig.height = 3, fig.width = 13}
+par(mfrow=c(1,4))
+par(mar=c(5, 7, 4, 2) + 0.1)
+
+plot(-jackknife.dat.2cr$'log-likelihood',ylab='Log-Likelihood:\n Training Data',xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+abline(v=32)
+abline(v=99)
+par(mar=c(5, 7, 4, 2) + 0.1)
+
+plot(jackknife.dat.2cr$'left-out-log-likelihood',ylab='Log-Likelihood:\n Test Data',xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+abline(v=32)
+abline(v=99)
+```
+
+## S3.3.3 Uncolonized-Contaminated-Colonized
+
+```{r,eval=FALSE, echo=FALSE}
+
+jackknife.dat.ucc <- data.frame(matrix(nrow=length(list.mssa),ncol=(length(thetaCurrent.ucc)+2) ))
+names(jackknife.dat.ucc) <- c('log-likelihood','left-out-log-likelihood','psiU','phiE','phiC','rhoUE','rhoEU','rhoEC','rhoCE')
+jackknife.list.ucc <- list.mssa
+njs <- length(list.mssa)
+for(i in 1:njs){
+  jdat <- jackknife.list.ucc[-i]
+  obj.jackknife.ucc <- function(theta) -getLogLikelihood.ucc(theta,jdat)
+  opt.jackknife.ucc <- optim(thetaCurrent.ucc,obj.jackknife.ucc,control=list(maxit=2000))
+  left.out.log.likelihood <- getLogLikelihood.ucc(opt.jackknife.ucc$par,jackknife.list.ucc[i])
+  jackknife.dat.ucc[i,] <- c(opt.jackknife.ucc$value,left.out.log.likelihood,opt.jackknife.ucc$par)
+}
+
+#save(jackknife.dat.ucc,file='jackknife_dat_ucc.Rdata')
+```
+
+```{r,eval=TRUE, echo=FALSE}
+load('jackknife_dat_ucc.Rdata')
+
+jackknife.dat.ucc$alpha <- exp(jackknife.dat.ucc$rhoUE)
+jackknife.dat.ucc$gamma <- exp(jackknife.dat.ucc$rhoCE)
+jackknife.dat.ucc$tau <- exp(jackknife.dat.ucc$rhoEU )+ exp( jackknife.dat.ucc$rhoEC )
+jackknife.dat.ucc$p <- exp(jackknife.dat.ucc$rhoEC)/jackknife.dat.ucc$tau
+```
+
+```{r,eval=TRUE,echo=FALSE,fig.height = 6, fig.width = 12}
+par(mfrow=c(2,4))
+plot(jackknife.dat.ucc$alpha,ylab=bquote(alpha),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(jackknife.dat.ucc$gamma,ylab=bquote(gamma),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(jackknife.dat.ucc$tau,ylab=bquote(tau),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(jackknife.dat.ucc$p,ylab=bquote(p),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.ucc$psiU)),ylab=bquote(psi[U]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.ucc$phiE)),ylab=bquote(phi[E]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.ucc$phiC)),ylab=bquote(phi[C]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+```
+
+The parameter estimates for the UCC model seem less sensitive overall to particular HCW in the data. The exception is the clearance rate, which increases if "persistently" positive individuals are omitted. The sensitivity estimate for the Colonized group does not change, particularly if "intermittent" individuals are omitted.
+
+The parameters describing the Contamination state change if "persistent" HCW are omitted. Recall that within each group of HCW, the number of tests decreases from left to right across the figure. This means $\tau$ and $p$ both increase if "persistent" individuals with many tests are omitted, i.e. the duration of contamination increases as more long-term persistent carriers are included. 
+ 
+```{r,eval=TRUE,echo=FALSE,fig.width = 13, fig.height = 3}
+par(mfrow=c(1,4))
+par(mar=c(5, 7, 4, 2) + 0.1)
+
+plot(-jackknife.dat.ucc$'log-likelihood',ylab='Log-Likelihood:\n Training Data',xlab='HCW omitted',cex.axis=axsiz,cex.lab=labsiz)
+abline(v=32)
+abline(v=99)
+par(mar=c(5, 7, 4, 2) + 0.1)
+
+plot(jackknife.dat.ucc$'left-out-log-likelihood',ylab='Log-Likelihood:\n Test Data',xlab='HCW omitted',cex.axis=axsiz,cex.lab=labsiz)
+abline(v=32)
+abline(v=99)
+
+```
+
+## S3.3.4 2 Strain
+
+```{r,eval=FALSE, echo=FALSE}
+
+jackknife.dat.2s <- data.frame(matrix(nrow=length(list.mssa),ncol=(length(thetaCurrent.2s)+2) ))
+names(jackknife.dat.2s) <- c('log-likelihood','left-out-log-likelihood','psiU','phiC1','phiC2','alpha1','alpha2','gamma1','gamma2')
+jackknife.list.2s <- list.mssa
+njs <- length(list.mssa)
+for(i in 1:njs){
+  jdat <- jackknife.list.2s[-i]
+  obj.jackknife.2s <- function(theta) -getLogLikelihood.2s(theta,jdat)
+  opt.jackknife.2s <- optim(thetaCurrent.2s,obj.jackknife.2s,control=list(maxit=2000))
+  left.out.log.likelihood <- getLogLikelihood.2s(opt.jackknife.2s$par,jackknife.list.2s[i])
+  jackknife.dat.2s[i,] <- c(opt.jackknife.2s$value,left.out.log.likelihood,opt.jackknife.2s$par)
+}
+
+#save(jackknife.dat.2s,file='jackknife_dat_2s.Rdata')
+```
+
+```{r,eval=TRUE, echo=FALSE}
+load('jackknife_dat_2s.Rdata')
+
+jackknife.dat.2s$alpha1 <- exp(jackknife.dat.2s$alpha1)
+jackknife.dat.2s$alpha2 <- exp(jackknife.dat.2s$alpha2)
+jackknife.dat.2s$gamma1 <- exp(jackknife.dat.2s$gamma1)
+jackknife.dat.2s$gamma2 <- exp(jackknife.dat.2s$gamma2)
+```
+
+```{r,eval=TRUE,echo=FALSE,fig.height = 6, fig.width = 12}
+par(mfrow=c(2,4))
+plot(jackknife.dat.2s$alpha1,ylab=bquote(alpha[1]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(jackknife.dat.2s$alpha2,ylab=bquote(alpha[2]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(jackknife.dat.2s$gamma1,ylab=bquote(gamma[1]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(jackknife.dat.2s$gamma2,ylab=bquote(gamma[2]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.2s$psiU)),ylab=bquote(psi[U]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.2s$phiC1)),ylab=bquote(phi[C1]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+plot(1/(1+exp(-jackknife.dat.2s$phiC2)),ylab=bquote(phi[C2]),xlab='HCW Omitted',cex.axis=axsiz,cex.lab=labsiz)
+```
+
+### S3.3.5 Jackknife comparison across the models
+
+People in the "intermittent" group have low likelihood. People in the "persistent" category have slightly lower likelihood than people in the "never" category, who have the highest likelihood.
+
+Within each group, there is a downward trend going to the right. This is because individual HCW are ordered from many tests to few within each category. Long timeseries have lower likelihood than short time series. Visual inspection suggests that outliers in the data do not play an outsized role in informing parameter estimates for the different models.
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 12, fig.height = 3}
+par(mfrow=c(1,4))
+par(mar=c(5, 7, 4, 2) + 0.1)
+
+plot(-jackknife.dat.ih$'log-likelihood',ylab='Log-Likelihood:\n Training Data',xlab='HCW Omitted',main='IH',cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+abline(v=32)
+abline(v=99)
+plot(-jackknife.dat.2cr$'log-likelihood',ylab='',xlab='HCW Omitted',main='2CR',cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+abline(v=32)
+abline(v=99)
+plot(-jackknife.dat.2s$'log-likelihood',ylab='',xlab='HCW Omitted',main='2S',cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+abline(v=32)
+abline(v=99)
+plot(-jackknife.dat.ucc$'log-likelihood',ylab='',xlab='HCW Omitted',main='UCC',cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+abline(v=32)
+abline(v=99)
+
+```
+
+
+# S3.4 Population Monte Carlo
+
+We use a Population Monte Carlo (PMC) scheme to sample parameters from the likelihoods (high posterior correlations make a standard Metropolis-Hastings scheme perform poorly). Histograms of the sampled parameters may be interpreted as posterior distributions obtained from uniform priors.
+
+We employ the "stretch move" updating scheme as presented in Goodman and Weare (2010) using ensemble sizes of 30 particles updated for 200 timesteps. Each particle lives in a space with as many dimensions as there are parameters in the model under consideration. There must be more particles than parameters, otherwise the scheme degenerates. A single timestep updates the entire ensemble by looping through all of the particles, so the actual number of updates in the scheme is the product of particle size and timesteps. The particles initialize near the MLE for each model according to a Gaussian distribution. They cannot all start at the MLE, or, again, the scheme degenerates. The precise choice of initial locations for the particles is otherwise unimportant, although initializing far from the MLE results in longer transients.
+
+The "strech move" is implemented by looping through all of the particles in the ensemble at each timestep. When the kth particle has been chosen, a distinct particle, j, is randomly selected from the remainder of the ensemble, and a ray is drawn starting at particle j and pointing to particle k. The proposed new position of particle k is determined by stretching/compressing along the ray by an amount drawn from a distribution. The stretch sizes we use are indepndently drawn from the (normalized) distribution $g(z) = \sqrt(a/x) / (2a-2)$ from Goodman and Weare (2010), and are all in fact chosen at the outset. Stretch factors smaller than one generate proposals that move particle k closer toward particle j, and stretch factors larger than one generate proposals that move particle k further away from particle j. The parameter $a$ is the maximal stretch (and 1/a the maximal compression). Proposals are accepted or rejected according to a standard Metropolis-Hastings acceptance probability, also described in Goodman and Weare (2010). A single timestep in the procedure loops through all of the particles, $X_k$, in the ensemble. Individual particles do not satisfy a detailed balance condition, but the ensemble as a whole does. 
+
+This method posseses affine invariance, meaning that the moves are equivalent to the best possible conditioned version of the problem that can be obtained under affine transformations of the parameter space. The likelihoods for our more complicated models (2CR, 2S, UCC) have highly asymmetric level sets (or, the parameters have high posterior correlations). The scheme laid out here effectively accomplishes the transformation of parameter space which renders the level sets as spherical as possible. This is shown to be the case in Goodman and Weare (2010).
+
+Clearly, this ensemble method outperforms standard Metropolis-Hastings because particles can use the location of the ensemble to update their positions. In single-particle Metropolis-Hastings, proposal moves are generated according to some distribution (often called $q$ in the MCMC literature). Ideally, the proposal distribution $q$ would be the target density itself, in which case every proposed move would be accepted (and there would of course be no need to use MCMC). While this is obviously never possible in practice, methods exist which try to incorporate information about the target density into the proposal distribution as the scheme proceeds. An ensemble of particles constitutes an approximate sample of the target distribution, so using the ensemble to generate new proposals is almost like drawing proposals from the target distribution itself.
+
+
+## S3.4.1 Identical Hosts (IH)
+
+```{r,eval=FALSE,echo=FALSE}
+
+likelihood <- function(theta) getLogLikelihood.ih(theta,list.mssa)
+
+
+likelihood_Current = -opt.ih$value
+thetaCurrent <- opt.ih$par
+
+dimEnsemble = 30 #number of particles for the PMC
+dimTime = 200 #how long to run
+
+source('MH_ensemble_markdown_gz.R')
+
+pmc.ih <- ensemble
+
+```
+
+```{r,eval=TRUE,echo=FALSE,message=FALSE}
+load("pmc_ih_g.Rdata")
+```
+
+```{r,echo=FALSE}
+lwdth=3 #how big should lines in the figures be?
+
+#sizing for plot axes
+labsiz <- 2.3
+axsiz <- 1.8
+lwdth=3
+
+```
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 12, fig.height = 3}
+alpha.pmc.ih= exp(pmc.ih[1,,])
+gam.pmc.ih = exp(pmc.ih[2,,])
+phi.pmc.ih = 1/(1+exp(-pmc.ih[3,,]) )
+psi.pmc.ih = 1/(1+exp(-pmc.ih[4,,]) )
+loglik.pmc.ih <- pmc.ih[5,,]
+
+thrsh <- ml.ih-4.6
+
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+par(mfrow=c(1,4))
+plot(loglik.pmc.ih[loglik.pmc.ih>thrsh]~alpha.pmc.ih[loglik.pmc.ih>thrsh],xlab=bquote(alpha),ylab='Log-Likelihood',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.ih[loglik.pmc.ih>thrsh]~gam.pmc.ih[loglik.pmc.ih>thrsh],xlab=bquote(gamma),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.ih[loglik.pmc.ih>thrsh]~phi.pmc.ih[loglik.pmc.ih>thrsh],xlab=bquote(phi),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.ih[loglik.pmc.ih>thrsh]~psi.pmc.ih[loglik.pmc.ih>thrsh],xlab=bquote(psi),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+
+```
+
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 12, fig.height = 3}
+par(mfrow=c(1,4))
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+plot(density(alpha.pmc.ih),main='',xlab=bquote(alpha),lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz)
+points(x=alpha.mle.ih,y=0,col='red',pch=19)
+
+plot(density(gam.pmc.ih),main='',xlab=bquote(gamma),lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=gam.mle.ih,y=0,col='red',pch=19)
+
+plot(density(phi.pmc.ih),main='',xlab=bquote(phi),lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=phi.mle.ih,y=0,col='red',pch=19)
+
+plot(density(psi.pmc.ih),main='',xlab=bquote(psi),lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=psi.mle.ih,y=0,col='red',pch=19)
+
+```
+
+Posteriors for carriage duration and prevalence
+```{r,eval=TRUE,echo=FALSE,fig.width = 13, fig.height = 3}
+dur.pmc.ih <- getDuration.ih(gam.pmc.ih)
+prev.pmc.ih <- getPrevalence.ih(alpha.pmc.ih,gam.pmc.ih)
+
+par(mfrow=c(1,4))
+plot(density(dur.pmc.ih),main='',xlab='Carriage Duration (Wks)',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylim=c(0,.06))
+points(x=duration.mle.ih ,y=0,col='red',pch=19)
+
+plot(density(prev.pmc.ih),main='',xlab='Prevalence',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylim=c(0,30),ylab='')
+points(x=prevalence.mle.ih ,y=0,col='red',pch=19,ylab='')
+
+```
+
+
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+#Population Monte Carlo has the feature that ensemble means often exhibit high autocorrelation, although individual particle trajecories exhibit low autocorrelation. This is readily observed by comparing traceplots of ensemble means with a few individual particles.
+
+par(mfrow=c(2,2))
+plot(apply(alpha.pmc.ih,1,mean),main='Ensemble average',ylab=bquote(alpha),type='l',xlab='Timestep')
+plot(alpha.pmc.ih[,1],main='Particle 1',ylab=bquote(alpha),type='l',xlab='Timestep')
+plot(alpha.pmc.ih[,2],main='Particle 2',ylab=bquote(alpha),type='l',xlab='Timestep')
+plot(alpha.pmc.ih[,3],main='Particle 3',ylab=bquote(alpha),type='l',xlab='Timestep')
+
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(apply(alpha.pmc.ih,1,mean),main=bquote(alpha))
+acf(apply(gam.pmc.ih,1,mean),main=bquote(gamma))
+acf(apply(phi.pmc.ih,1,mean),main=bquote(phi))
+acf(apply(psi.pmc.ih,1,mean),main=bquote(psi))
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(alpha.pmc.ih[,1],main=bquote(alpha))
+acf(gam.pmc.ih[,1],main=bquote(gamma))
+acf(phi.pmc.ih[,1],main=bquote(phi))
+acf(psi.pmc.ih[,1],main=bquote(psi))
+```
+
+## S3.4.2 2 Clearance Rates (2CR):
+
+```{r,eval=FALSE,echo=FALSE}
+
+likelihood <- function(theta) getLogLikelihood.2cr(theta,list.mssa)
+
+
+likelihood_Current = -opt.2cr$value
+thetaCurrent <- opt.2cr$par
+
+dimEnsemble = 30 #number of particles for the PMC
+dimTime = 200 #how long to run
+
+source('MH_ensemble_markdown_gz.R')
+
+pmc.2cr <- ensemble
+
+```
+
+```{r,eval=TRUE,echo=FALSE,message=FALSE}
+load("pmc_2cr_g.Rdata") #saved on ap revious run
+```
+
+```{r,eval=TRUE,echo=FALSE}
+alpha.pmc.2cr <- exp(pmc.2cr[1,,])
+gamma1.pmc.2cr <- exp(pmc.2cr[2,,])
+gamma2.pmc.2cr <- gamma1.pmc.2cr/(1+ exp(-pmc.2cr[3,,]) )
+sigma.pmc.2cr <- 1/(1+exp(-pmc.2cr[4,,]))
+phi1.pmc.2cr <- 1/(1+exp(-pmc.2cr[5,,]))
+psi1.pmc.2cr <- 1/(1+exp(-pmc.2cr[6,,]))
+phi2.pmc.2cr <- 1/(1+exp(-pmc.2cr[7,,]))
+psi2.pmc.2cr <- 1/(1+exp(-pmc.2cr[8,,]))
+loglik.pmc.2cr <- pmc.2cr[9,,]
+```
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 12, fig.height = 6}
+thrshld <- max(loglik.pmc.2cr)-3
+par(mfrow=c(2,4))
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+plot(loglik.pmc.2cr[loglik.pmc.2cr>thrshld]~alpha.pmc.2cr[loglik.pmc.2cr>thrshld],xlab=bquote(alpha),ylab='Log-Likelihood',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2cr[loglik.pmc.2cr>thrshld]~gamma1.pmc.2cr[loglik.pmc.2cr>thrshld],xlab=bquote(gamma[1]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2cr[loglik.pmc.2cr>thrshld]~gamma2.pmc.2cr[loglik.pmc.2cr>thrshld],xlab=bquote(gamma[2]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2cr[loglik.pmc.2cr>thrshld]~sigma.pmc.2cr[loglik.pmc.2cr>thrshld],xlab=bquote(sigma),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+
+plot(loglik.pmc.2cr[loglik.pmc.2cr>thrshld]~phi1.pmc.2cr[loglik.pmc.2cr>thrshld],xlab=bquote(phi[1]),ylab='Log-Likelihood',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2cr[loglik.pmc.2cr>thrshld]~psi1.pmc.2cr[loglik.pmc.2cr>thrshld],xlab=bquote(psi[1]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2cr[loglik.pmc.2cr>thrshld]~phi2.pmc.2cr[loglik.pmc.2cr>thrshld],xlab=bquote(phi[2]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2cr[loglik.pmc.2cr>thrshld]~psi2.pmc.2cr[loglik.pmc.2cr>thrshld],xlab=bquote(psi[2]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+
+```
+
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 12, fig.height = 6}
+par(mfrow=c(2,4))
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+plot(density(alpha.pmc.2cr),xlab=bquote(alpha),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz)
+points(x=alpha.mle.2cr,y=0,col='red',pch=19)
+
+plot(density(gamma1.pmc.2cr),xlab=bquote(gamma[1]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=gamma1.mle.2cr,y=0,col='red',pch=19)
+
+plot(density(gamma2.pmc.2cr),xlab=bquote(gamma[2]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=gamma2.mle.2cr,y=0,col='red',pch=19)
+
+plot(density(sigma.pmc.2cr),xlab=bquote(sigma),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=sigma.mle.2cr,y=0,col='red',pch=19)
+
+plot(density(phi1.pmc.2cr),xlab=bquote(phi[1]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz)
+points(x=phi1.mle.2cr,y=0,col='red',pch=19)
+
+plot(density(phi2.pmc.2cr),xlab=bquote(phi[2]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=phi2.mle.2cr,y=0,col='red',pch=19)
+
+plot(density(psi1.pmc.2cr),xlab=bquote(psi[1]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=psi1.mle.2cr,y=0,col='red',pch=19)
+
+plot(density(psi2.pmc.2cr),xlab=bquote(psi[2]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=psi2.mle.2cr,y=0,col='red',pch=19)
+
+```
+
+
+
+Posteriors for carriage duration and prevalence
+```{r,eval=TRUE,echo=FALSE,fig.width = 13, fig.height = 3}
+dur.pmc.2cr <- getDuration.2cr(alpha.pmc.2cr,gamma1.pmc.2cr,gamma2.pmc.2cr,sigma.pmc.2cr)
+prev.pmc.2cr <- getPrevalence.2cr(alpha.pmc.2cr,gamma1.pmc.2cr,gamma2.pmc.2cr,sigma.pmc.2cr)
+
+par(mfrow=c(1,4))
+plot(density(dur.pmc.2cr),main='',xlab='Carriage Duration (Wks)',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylim=c(0,0.05))
+points(x=duration.mle.2cr,y=0,col='red',pch=19)
+
+plot(density(prev.pmc.2cr),main='',xlab='Prevalence',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylim=c(0,40),ylab='')
+points(x=prevalence.mle.2cr,y=0,col='red',pch=19)
+
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+plot(apply(alpha.pmc.2cr,1,mean),main='Ensemble average',ylab=bquote(alpha),type='l',xlab='Timestep')
+plot(alpha.pmc.2cr[,1],main='Particle 1',ylab=bquote(alpha),type='l',xlab='Timestep')
+plot(alpha.pmc.2cr[,2],main='Particle 2',ylab=bquote(alpha),type='l',xlab='Timestep')
+plot(alpha.pmc.2cr[,3],main='Particle 3',ylab=bquote(alpha),type='l',xlab='Timestep')
+
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(apply(alpha.pmc.2cr,1,mean),main=bquote(alpha))
+acf(apply(gamma1.pmc.2cr,1,mean),main=bquote(gamma[1]))
+acf(apply(gamma2.pmc.2cr,1,mean),main=bquote(gamma[2]))
+acf(apply(sigma.pmc.2cr,1,mean),main=bquote(sigma))
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(apply(phi1.pmc.2cr,1,mean),main=bquote(phi[1]))
+acf(apply(phi2.pmc.2cr,1,mean),main=bquote(phi[2]))
+acf(apply(psi1.pmc.2cr,1,mean),main=bquote(psi[1]))
+acf(apply(psi2.pmc.2cr,1,mean),main=bquote(psi[2]))
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(alpha.pmc.2cr[,1],main=bquote(alpha))
+acf(gamma1.pmc.2cr[,1],main=bquote(gamma[1]))
+acf(gamma2.pmc.2cr[,1],main=bquote(gamma[2]))
+acf(sigma.pmc.2cr[,1],main=bquote(sigma))
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(phi1.pmc.2cr[,1],main=bquote(phi[1]))
+acf(phi2.pmc.2cr[,1],main=bquote(phi[2]))
+acf(psi1.pmc.2cr[,1],main=bquote(psi[1]))
+acf(psi2.pmc.2cr[,1],main=bquote(psi[2]))
+```
+
+## S3.4.3 Uncolonized-Contaminated-Colonized (UCC):
+
+```{r,eval=FALSE,echo=FALSE}
+
+likelihood <- function(theta) getLogLikelihood.ucc(theta,list.mssa)
+
+
+likelihood_Current = -opt.ucc$value
+thetaCurrent <- opt.ucc$par
+
+dimEnsemble = 30 #number of particles for the PMC
+dimTime = 200 #how long to run
+
+source('MH_ensemble_markdown_gz.R')
+
+pmc.ucc <- ensemble
+
+```
+
+```{r,eval=TRUE,echo=FALSE,message=FALSE}
+load("pmc_ucc_g.Rdata") #saved on a previous run
+```
+
+```{r,eval=TRUE,echo=FALSE}
+alpha.pmc.ucc = exp(pmc.ucc[4,,])
+rhoEU.pmc.ucc = exp(pmc.ucc[5,,])
+rhoEC.pmc.ucc = exp(pmc.ucc[6,,])
+tau.pmc.ucc <- rhoEU.pmc.ucc+rhoEC.pmc.ucc
+p.pmc.ucc <- rhoEC.pmc.ucc/tau.pmc.ucc
+gamma.pmc.ucc = exp(pmc.ucc[7,,])
+psiU.pmc.ucc = 1/(1+exp(-pmc.ucc[1,,]))
+phiE.pmc.ucc = 1/(1+exp(-pmc.ucc[2,,]))
+phiC.pmc.ucc = 1/(1+exp(-pmc.ucc[3,,]))
+loglik.pmc.ucc <- pmc.ucc[8,,]
+
+```
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 12, fig.height = 6}
+thrshld <- max(loglik.pmc.ucc)-5
+par(mfrow=c(2,4))
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+plot(loglik.pmc.ucc[loglik.pmc.ucc>thrshld]~alpha.pmc.ucc[loglik.pmc.ucc>thrshld],xlab=bquote(alpha),ylab='Log-Likelihood',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.ucc[loglik.pmc.ucc>thrshld]~gamma.pmc.ucc[loglik.pmc.ucc>thrshld],xlab=bquote(gamma),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.ucc[loglik.pmc.ucc>thrshld]~tau.pmc.ucc[loglik.pmc.ucc>thrshld],xlab=bquote(tau),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.ucc[loglik.pmc.ucc>thrshld]~p.pmc.ucc[loglik.pmc.ucc>thrshld],xlab=bquote(p),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+#par(mfrow=c(2,2))
+plot(loglik.pmc.ucc[loglik.pmc.ucc>thrshld]~psiU.pmc.ucc[loglik.pmc.ucc>thrshld],xlab=bquote(psi[U]),ylab='Log-Likelihood',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.ucc[loglik.pmc.ucc>thrshld]~phiE.pmc.ucc[loglik.pmc.ucc>thrshld],xlab=bquote(phi[E]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.ucc[loglik.pmc.ucc>thrshld]~phiC.pmc.ucc[loglik.pmc.ucc>thrshld],xlab=bquote(phi[C]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+```
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 12, fig.height = 6}
+par(mfrow=c(2,4))
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+plot(density(alpha.pmc.ucc),xlab=bquote(alpha),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz)
+points(x=alpha.mle.ucc,y=0,col='red',pch=19)
+
+plot(density(gamma.pmc.ucc),xlab=bquote(gamma),main='',xlim=c(0,.3),lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=gamma.mle.ucc,y=0,col='red',pch=19)
+
+plot(density(tau.pmc.ucc),xlab=bquote(tau),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=tau.mle.ucc,y=0,col='red',pch=19)
+
+plot(density(p.pmc.ucc),xlab=bquote(p),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=p.mle.ucc,y=0,col='red',pch=19)
+
+plot(density(psiU.pmc.ucc),xlab=bquote(psi[U]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz)
+points(x=psiU.mle.ucc,y=0,col='red',pch=19)
+
+plot(density(phiE.pmc.ucc),xlab=bquote(phi[E]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=phiE.mle.ucc,y=0,col='red',pch=19)
+
+plot(density(phiC.pmc.ucc),xlab=bquote(phi[C]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=phiC.mle.ucc,y=0,col='red',pch=19)
+
+```
+
+
+Posteriors for carriage duration and prevalence
+```{r,eval=TRUE,echo=FALSE,fig.width = 13, fig.height = 3}
+dur.pmc.ucc <- getDuration.ucc(alpha.pmc.ucc,gamma.pmc.ucc,tau.pmc.ucc,p.pmc.ucc)
+prev.pmc.ucc <- getPrevalence.ucc(alpha.pmc.ucc,gamma.pmc.ucc,tau.pmc.ucc,p.pmc.ucc)
+
+par(mfrow=c(1,4))
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+plot(density(dur.pmc.ucc),main='',xlab='Carriage Duration (Wks)',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylim=c(0,.1),xlim=c(0,250))
+points(y=0,x=duration.mle.ucc,col='red',pch=19)
+
+plot(density(prev.pmc.ucc),main='',xlab='Prevalence',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylim=c(0,40),ylab='')
+points(x=prevalence.mle.ucc,y=0,col='red',pch=19,ylab='')
+
+```
+
+
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+plot(apply(alpha.pmc.ucc,1,mean),main='Ensemble average',ylab=bquote(alpha),type='l',xlab='Timestep')
+plot(alpha.pmc.ucc[,1],main='Particle 1',ylab=bquote(alpha),type='l',xlab='Timestep')
+plot(alpha.pmc.ucc[,2],main='Particle 2',ylab=bquote(alpha),type='l',xlab='Timestep')
+plot(alpha.pmc.ucc[,3],main='Particle 3',ylab=bquote(alpha),type='l',xlab='Timestep')
+
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(apply(alpha.pmc.ucc,1,mean),main=bquote(alpha))
+acf(apply(gamma.pmc.ucc,1,mean),main=bquote(gamma))
+acf(apply(tau.pmc.ucc,1,mean),main=bquote(tau))
+acf(apply(p.pmc.ucc,1,mean),main=bquote(p))
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(apply(psiU.pmc.ucc,1,mean),main=bquote(psi[U]))
+acf(apply(phiE.pmc.ucc,1,mean),main=bquote(phi[E]))
+acf(apply(phiC.pmc.ucc,1,mean),main=bquote(psi[C]))
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(alpha.pmc.ucc[,1],main=bquote(alpha))
+acf(gamma.pmc.ucc[,1],main=bquote(gamma))
+acf(tau.pmc.ucc[,1],main=bquote(tau))
+acf(p.pmc.ucc[,1],main=bquote(p))
+```
+
+```{r,eval=FALSE,echo=FALSE,fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+acf(psiU.pmc.ucc[,1],main=bquote(psi[U]))
+acf(phiE.pmc.ucc[,1],main=bquote(phi[E]))
+acf(phiC.pmc.ucc[,1],main=bquote(psi[C]))
+```
+
+
+## S3.4.4 2-Strain (2S):
+
+```{r,eval=FALSE,echo=FALSE}
+
+likelihood <- function(theta) getLogLikelihood.2s(theta,list.mssa)
+
+
+likelihood_Current = -opt.2s$value
+thetaCurrent <- opt.2s$par
+
+dimEnsemble = 30 #number of particles for the PMC
+dimTime = 200 #how long to run
+
+source('MH_ensemble_markdown_gz.R')
+
+pmc.2s <- ensemble
+
+```
+
+```{r,eval=TRUE,echo=FALSE}
+load('pmc_2s_g.Rdata')
+alpha1.pmc.2s = exp(pmc.2s[4,,])
+alpha2.pmc.2s = exp(pmc.2s[5,,])
+gamma1.pmc.2s = exp(pmc.2s[6,,])
+gamma2.pmc.2s = exp(pmc.2s[7,,])
+psiU.pmc.2s = 1/(1+exp(-pmc.2s[1,,]))
+phiC1.pmc.2s = 1/(1+exp(-pmc.2s[2,,]))
+phiC2.pmc.2s = 1/(1+exp(-pmc.2s[3,,]))
+loglik.pmc.2s <- pmc.2s[8,,]
+thrshld <- max(loglik.pmc.2s)-5
+
+```
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 12, fig.height = 6}
+
+par(mfrow=c(2,4))
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+plot(loglik.pmc.2s[loglik.pmc.2s>thrshld]~alpha1.pmc.2s[loglik.pmc.2s>thrshld],xlab=bquote(alpha[1]),ylab='Log-Likelihood',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2s[loglik.pmc.2s>thrshld]~alpha2.pmc.2s[loglik.pmc.2s>thrshld],xlab=bquote(alpha[2]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2s[loglik.pmc.2s>thrshld]~gamma1.pmc.2s[loglik.pmc.2s>thrshld],xlab=bquote(gamma[1]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2s[loglik.pmc.2s>thrshld]~gamma2.pmc.2s[loglik.pmc.2s>thrshld],xlab=bquote(gamma[2]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+
+plot(loglik.pmc.2s[loglik.pmc.2s>thrshld]~psiU.pmc.2s[loglik.pmc.2s>thrshld],xlab=bquote(psi[U]),ylab='Log-Likelihood',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2s[loglik.pmc.2s>thrshld]~phiC1.pmc.2s[loglik.pmc.2s>thrshld],xlab=bquote(phi[C1]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+plot(loglik.pmc.2s[loglik.pmc.2s>thrshld]~phiC2.pmc.2s[loglik.pmc.2s>thrshld],xlab=bquote(phi[C2]),ylab='',cex.lab=labsiz,cex.axis=axsiz)
+
+```
+
+
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 12, fig.height = 6}
+par(mfrow=c(2,4))
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+
+plot(density(alpha1.pmc.2s),xlab=bquote(alpha[1]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz)
+points(x=alpha1.mle.2s,y=0,col='red',pch=19)
+
+plot(density(alpha2.pmc.2s),xlab=bquote(alpha[2]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=alpha2.mle.2s ,y=0,col='red',pch=19)
+
+plot(density(gamma1.pmc.2s),xlab=bquote(gamma[1]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=gamma1.mle.2s,y=0,col='red',pch=19)
+
+plot(density(gamma2.pmc.2s),xlab=bquote(gamma[2]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=gamma2.mle.2s,y=0,col='red',pch=19)
+
+plot(density(psiU.pmc.2s),xlab=bquote(psi[U]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz)
+points(x=psiU.mle.2s,y=0,col='red',pch=19)
+
+plot(density(phiC1.pmc.2s),xlab=bquote(phi[C1]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=phiC1.mle.2s,y=0,col='red',pch=19)
+
+plot(density(phiC2.pmc.2s),xlab=bquote(phi[C2]),main='',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylab='')
+points(x=phiC2.mle.2s,y=0,col='red',pch=19)
+
+```
+
+Posteriors for prevalence and carriage duration:
+```{r,eval=TRUE,echo=FALSE,fig.width = 13, fig.height = 3}
+dur.pmc.2s <- getDuration.2s(alpha1.pmc.2s,alpha2.pmc.2s,gamma1.pmc.2s,gamma2.pmc.2s)
+prev.pmc.2s <- getPrevalence.2s(alpha1.pmc.2s,alpha2.pmc.2s,gamma1.pmc.2s,gamma2.pmc.2s)
+
+par(mfrow=c(1,4))
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+plot(density(dur.pmc.2s),main='',xlab='Carriage Duration (Wks)',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylim=c(0,.01),xlim=c(0,850))
+points(y=0,x=duration.mle.2s,col='red',pch=19)
+
+plot(density(prev.pmc.2s),main='',xlab='Prevalence',lwd=lwdth,cex.lab=labsiz,cex.axis=axsiz,ylim=c(0,40),ylab='')
+points(x=prevalence.mle.2s,y=0,col='red',pch=19)
+
+```
+
+The precision in the estimated parameters suggests the models are identifiable. There are no obvious signs of overfitting, except for the acquisition rate for the rare/slow strain in the 2S model.
+
+
+## S3.4.5 Posterior Distributions for Carriage Duration and Prevalence Across Models
+```{r,eval=TRUE,echo=FALSE,fig.width = 4, fig.height = 8}
+require(scales)
+
+#color version
+dur.pmc.ucc <- getDuration.ucc(alpha.pmc.ucc,gamma.pmc.ucc,tau.pmc.ucc,p.pmc.ucc)
+prev.pmc.ucc <- getPrevalence.ucc(alpha.pmc.ucc,gamma.pmc.ucc,tau.pmc.ucc,p.pmc.ucc)
+
+lwdth <- 2
+
+labsiz <- 1
+axsiz <- 1
+
+par(mfrow=c(2,1),family='sans')
+par(mar=c(4, 5, 4, 2) + 0.1)
+
+plot(density(dur.pmc.ih),
+     main='',
+     xlab='Carriage Duration,Weeks',
+     #xlim=c(0,730),
+     ylim=c(0,.04),
+     lwd=lwdth,
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     axes=F,
+     family='sans')
+axis(side=1,at=seq(0,1000,by=200),pos=0)
+axis(side=2,at=seq(0,.1,by=.01),las=2,pos=0)
+lines(density(dur.pmc.2cr),col='blue',lwd=lwdth)
+lines(density(dur.pmc.ucc),col='red',lwd=lwdth)
+lines(density(dur.pmc.2s),col='darkgreen',lwd=lwdth)
+#lines(density(1/gamma1.pmc.sii),col=alpha('darkgreen',.3),lwd=lwdth) #plotting the distinct strains from the 2s model
+#lines(density(1/gamma2.pmc.sii),col=alpha('darkgreen',.3),lwd=lwdth)
+
+legend('topright',legend=c('IH','2CR','2S','UCC'),col=c('black','blue','darkgreen','red'),lty=1,lwd=lwdth,title=expression(underline(Model)))
+
+
+plot(density(prev.pmc.ih),
+     main='',
+     xlab='Prevalence',
+     ylab='Density',
+     ylim=c(0,30),
+     lwd=lwdth,
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     axes=F)
+axis(side=1,at=seq(0,1,by=.2),pos=0)
+axis(side=2,at=seq(0,50,by=10),pos=0,las=2)
+lines(density(prev.pmc.2cr),col='blue',lwd=lwdth)
+lines(density(prev.pmc.ucc),col='red',lwd=lwdth)
+lines(density(prev.pmc.2s),col='darkgreen',lwd=lwdth)
+
+
+```
+
+Grayscale version:
+```{r,eval=TRUE,echo=FALSE,fig.width = 4, fig.height = 8}
+require(scales)
+
+#pdf(file='Figure7.pdf',width=6,height=9)
+#grayscale version
+dur.pmc.ucc <- getDuration.ucc(alpha.pmc.ucc,gamma.pmc.ucc,tau.pmc.ucc,p.pmc.ucc)
+prev.pmc.ucc <- getPrevalence.ucc(alpha.pmc.ucc,gamma.pmc.ucc,tau.pmc.ucc,p.pmc.ucc)
+
+lwdth <- 2
+
+labsiz <- 1
+axsiz <- 1
+
+par(mfrow=c(2,1),family='sans',omi=c(1,1,1,0),mai=c(1, 1, 1, 1) )
+
+
+plot(density(dur.pmc.ih),
+     main='',
+     xlab='Carriage Duration,Weeks',
+     xlim=c(0,610),
+     ylim=c(0,.035),
+     lwd=lwdth,
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     axes=F,
+     family='sans')
+axis(side=1,at=seq(0,600,by=200),labels=c(0,200,400,600),pos=0)
+axis(side=2,at=seq(0,.1,by=.01),las=2,pos=0)
+lines(density(dur.pmc.2cr),col='darkgray',lty=1,lwd=lwdth)
+lines(density(dur.pmc.2s),col='black',lty=3,lwd=lwdth)
+lines(density(dur.pmc.ucc),col='black',lty=4,lwd=lwdth)
+#lines(density(1/gamma1.pmc.sii),col=alpha('darkgreen',.3),lwd=lwdth) #plotting the distinct strains from the 2s model
+#lines(density(1/gamma2.pmc.sii),col=alpha('darkgreen',.3),lwd=lwdth)
+text(x=-400,y=.05,label='A)',xpd=NA)
+
+legend('topright',
+       legend=c('IH','2CR','2S','UCC'),
+       col=c('black','darkgray','black','black'),
+       lty=c(1,1,3,4),
+       lwd=lwdth,title=expression(underline(Model)))
+
+
+plot(density(prev.pmc.ih),
+     main='',
+     xlab='Prevalence',
+     ylab='Density',
+     ylim=c(0,30),
+     lwd=lwdth,
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     axes=F)
+axis(side=1,at=seq(0,1,by=.2),pos=0)
+axis(side=2,at=seq(0,50,by=10),pos=0,las=2)
+
+lines(density(prev.pmc.2cr),col='darkgray',lty=1,lwd=lwdth)
+lines(density(prev.pmc.2s),col='black',lty=3,lwd=lwdth)
+lines(density(prev.pmc.ucc),col='black',lty=4,lwd=lwdth)
+
+text(x=-.62,y=40,label='B)',xpd=NA)
+
+#dev.off()
+
+```
+# S3.5 Simulations 
+
+The key takeaway from many longitudinal studies of \textit{S. aureus} colonization is the appearance of persistent carriers, intermittent carriers, and noncarriers. This has been taken as evidence for heterogeneity in colonization risk. We simulate from each model (assuming the same number of individuals in the Price et al study) and examine how they differ. We look at the run lengths of consecutive positive tests, negative tests, total number of positive tests per individual (often termed the "Carrier Index"), and count the numbers of each carrier type (never positive, intermittently positive, or always positive).
+
+In addition to simulating 500 data sets with the same structure as the Price study, we simulate 30 datasets for each model for a variety of study durations and testing frequencies. We consider studies lasting 1 year and 5 years at weekly and monthly testing frequencies, as well as a 20 year study with biannual testing (every 6 months) and monthly testing.
+
+
+```{r,eval=TRUE,echo=FALSE}
+#initialize the simulations - testing frequency, and duration
+
+#to run this, need to have the MLEs from the start of this document loaded in!
+
+
+source('dataLoader.R') #load in the Price data
+
+maxIters <- 30 #how many simulations to run each time?
+numSubjects <- length(list.mssa)
+
+
+#uncomment this line to simulate using the same study design as Price et al. (imperfect attendance & variable numbers of tests per person)
+#times <- times.mssa
+#numTests <- 15
+#numYrs <- 'Price'
+#testFreq <- 'Study'
+
+
+# uncomment these lines below to simulate for a custom duration and testing frequency; assume all individuals are tested each time for simplicity
+
+testFreq <- 4 #testing frequency; weeks betwen tests, mainly look at 1 (weekly), 4 (monthly), 26 (biannual)
+numYrs <- 20 #how many years to simulate, mainlook look at 1,5,26
+times <- list()
+for(i in 1:numSubjects) times[[i]] <- diff(seq(0,52*numYrs,by=testFreq))
+numTests <- length(times[[1]]) + 1
+
+#what do you want to name the simulated data files? one for each model
+nm.IH <- paste('sims_IH_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2CR <- paste('sims_2CR_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.UCC <- paste('sims_UCC_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2S <- paste('sims_2S_',numYrs,'yrs_',testFreq,'wks',sep='')
+
+#names of dataframe columns which will b tracking carrier index, runlengths of positives, and runlengths of negatives in the simulations
+#these are the main statistics we want to plot for model comparison
+cinms <- paste('carrier indx=',0:numTests )
+cpnms <- paste(1:numTests,'consecutive positives')
+cnnms <- paste(1:numTests,'consecutive negatives')
+
+
+
+```
+
+```{r,eval=FALSE,echo=FALSE}
+#generate the simulated datasets
+
+#build a dataframe to store information about the simulations
+dts <- data.frame('never'=0,'intermittently'=0,'persistently'=0,
+ 'model.specificity'=0, 'model.sensitivity'=0,'loglik'=0,'cnv'=0) 
+
+dts1 <- data.frame(t(array(0,(numTests+1))))
+names(dts1) <- cinms
+dts <- cbind(dts,dts1)
+
+dts1 <-data.frame(t(array(0,(numTests))))
+names(dts1) <- cpnms
+dts <- cbind(dts,dts1)
+rm(dts1)
+
+dts1 <-data.frame(t(array(0,(numTests))))
+names(dts1) <- cnnms
+dts <- cbind(dts,dts1)
+rm(dts1)
+
+dts.gen <- dts
+
+
+#simulate the IH model
+simNm <- 'IHSim_gen.R' #name of the file which produces the simulation
+dts.theta <- data.frame('alpha'=0,'gamma'=0,'phi'=0,'psi'=0)
+dts <- cbind(dts.gen, dts.theta)
+Adim=2
+getTrueState <- function(data) getTrueState.ih(data)
+getLogLikelihood <- function(theta,X) getLogLikelihood.ih(theta,X)
+thetaCurrent <- opt.ih$par
+
+source('getSims.R') #calls simNm to generate the data, and extracts the statistics we want
+
+#transform parameters back; the likelihood function uses these transformations to freely explore parameter space without boundaries
+dts$alpha= exp(dts$alpha)
+dts$gamma = exp(dts$gamma)
+dts$phi = 1/(1+exp(-dts$phi) )
+dts$psi = 1/(1+exp(-dts$psi) )
+dts.ih <- dts
+
+
+##simulate the 2CR model
+simNm <- '2CRSim_gen.R' #name of the file which produces the simulation
+dts.theta <- data.frame('alpha'=0,'gamma1'=0,'gamma2'=0,'sigma'=0,'phi1'=0,'psi1'=0,'phi2'=0,'psi2'=0)
+dts <- cbind(dts.gen, dts.theta)
+Adim=4
+getTrueState <- function(data) getTrueState.2cr(data)
+getLogLikelihood <- function(theta,X) getLogLikelihood.2cr(theta,X)
+thetaCurrent <- opt.2cr$par
+
+source('getSims.R') #calls simNm to generate the data, and extracts the statistics we want
+
+#transform parameters back; the likelihood function uses these transformations to freely explore parameter space without boundaries
+dts$alpha= exp(dts$alpha)
+dts$gamma1 = exp(dts$gamma1)
+dts$gamma2 = dts$gamma1*1/(1+ exp(-dts$gamma2) )
+dts$sigma = 1/(1+exp(-dts$sigma))
+dts$phi1 = 1/(1+exp(-dts$phi1))
+dts$phi2 = 1/(1+exp(-dts$phi2))
+dts$psi1 = 1/(1+exp(-dts$psi1))
+dts$psi2 = 1/(1+exp(-dts$psi2))
+dts.2cr <- dts
+
+
+#simulate the UCC model
+simNm <- 'UCCSim_gen.R' #name of the file which produces the simulation
+#UCC model is parametrized in terms of rates between the states
+dts.theta <- data.frame('psiU'=0,'phiE'=0,'phiC'=0,'rhoUE'=0,'rhoEU'=0,'rhoEC'=0,'rhoCE'=0)
+dts <- cbind(dts.gen, dts.theta)
+
+Adim=3
+getTrueState <- function(data) getTrueState.ucc(data)
+getLogLikelihood <- function(theta,X) getLogLikelihood.ucc(theta,X)
+thetaCurrent <- opt.ucc$par
+
+source('getSims.R')  #calls simNm to generate the data, and extracts the statistics we want
+#transform parameters back; the likelihood function uses these transformations to freely explore parameter space without boundariesdts$alpha = exp(dts$rhoUE)
+dts$rhoEU = exp(dts$rhoEU)
+dts$rhoEC = exp(dts$rhoEC)
+dts$tau <- dts$rhoEU+dts$rhoEC
+dts$p <- dts$rhoEC/dts$tau
+dts$gamma = exp(dts$rhoCE) 
+dts$psiU = 1/(1+exp(-dts$psiU))
+dts$phiE = 1/(1+exp(-dts$phiE))
+dts$phiC = 1/(1+exp(-dts$phiC))
+dts.ucc <- dts
+
+#simulate the SII model
+simNm <- '2SSim_gen.R' #name of the file which produces the simulation
+dts.theta <- data.frame('psiU'=0,'phiC1'=0,'phiC2'=0,'alpha1'=0,'alpha2'=0,'gamma1'=0,'gamma2'=0)
+dts <- cbind(dts.gen, dts.theta)
+Adim=3
+getTrueState <- function(data) getTrueState.2s(data)
+getLogLikelihood <- function(theta,X) getLogLikelihood.2s(theta,X)
+thetaCurrent <- opt.2s$par
+
+source('getSims.R')
+#transform parameters back; the likelihood function uses these transformations to freely explore parameter space without boundaries
+dts$alpha1 = exp(dts$alpha1)
+dts$alpha2 = exp(dts$alpha2)
+dts$gamma1 = exp(dts$gamma1)
+dts$gamma2 = exp(dts$gamma2)
+dts$psiU = 1/(1+exp(-dts$psiU))
+dts$phiC1 = 1/(1+exp(-dts$phiC1))
+dts$phiC2 = 1/(1+exp(-dts$phiC2))
+dts.2S <- dts
+
+#want to save the simulations?
+save(dts.ih,file=paste(nm.IH,'.Rdata',sep=''))
+save(dts.2cr,file=paste(nm.2CR,'.Rdata',sep=''))
+save(dts.ucc,file=paste(nm.UCC,'.Rdata',sep=''))
+save(dts.2S,file=paste(nm.2S,'.Rdata',sep=''))
+
+```
+
+# S3.5.1 Simulating the Price Study
+
+The original data are well-described by each of the models. In the next section, we explore where model predictions start to diverge from each other.
+
+```{r,echo=FALSE}
+#load in the simulations which use the Price testing schedule
+
+#load('sims_IH.Rdata')
+#dts.ih <- dts.Price.ih
+#load('sims_2CR.Rdata')
+#dts.2cr <- dts.Price.2cr
+#load('sims_UCC.Rdata')
+#dts.ucc <- dts.Price.ucc
+#load('sims_2s.Rdata')
+#dts.2S <- dts.Price.sii
+
+load("sims_IH_Priceyrs_Studywks.Rdata")
+load("sims_2CR_Priceyrs_Studywks.Rdata")
+load("sims_UCC_Priceyrs_Studywks.Rdata")
+load("sims_2S_Priceyrs_Studywks.Rdata")
+
+maxIters <- dim(dts.ih)[1]
+numTests <- 15
+
+
+cinms <- paste('carrier indx=',0:numTests )
+cpnms <- paste(1:numTests,'consecutive positives')
+cnnms <- paste(1:numTests,'consecutive negatives')
+source('dataLoader.R') #load in the price data for comparison
+
+ getConsecutivePositives <- function(x){
+   x <- x$test
+   vls <- rle(x)$values
+   lths <- rle(x)$lengths
+   ConsecutivePositives <- sort(lths[vls==2])
+   return(ConsecutivePositives)
+ } 
+ 
+ getConsecutiveNegatives <- function(x){
+   x <- x$test
+   vls <- rle(x)$values
+   lths <- rle(x)$lengths
+   ConsecutiveNegatives <- sort(lths[vls==1])
+   return(ConsecutiveNegatives)
+ } 
+ 
+
+#look at the numbers of consecutive positive and negative tests for the original data
+ consecPos <- data.frame(table(unlist(lapply(list.mssa, getConsecutivePositives ))))
+ names(consecPos) <- c('lengths','Freq')
+ consecPos$lengths <- as.numeric(levels(consecPos$lengths))
+ crud <- data.frame('lengths'=1:numTests, 'Freq'=rep(0,numTests))
+ crud$Freq[crud$lengths %in% intersect(crud$length,consecPos$lengths)] <- consecPos$Freq
+ consecPos <- crud
+ rm(crud)
+ 
+ consecNeg <- data.frame(table(unlist(lapply(list.mssa, getConsecutiveNegatives ))))
+ names(consecNeg) <- c('lengths','Freq')
+ consecNeg$lengths <- as.numeric(levels(consecNeg$lengths))
+ crud <- data.frame('lengths'=1:numTests, 'Freq'=rep(0,numTests))
+ crud$Freq[crud$lengths %in% intersect(crud$length,consecNeg$lengths)] <- consecNeg$Freq
+ consecNeg <- crud
+ rm(crud)
+ 
+  ci <- data.frame(table(unlist(lapply(list.mssa, function(x) sum(x$test==2) ))))
+ names(ci) <- c('numPos','Freq')
+ ci$numPos <- as.numeric(levels(ci$numPos))
+ crud <- data.frame('numPos'=0:numTests, 'Freq'=rep(0,numTests+1))
+ crud$Freq[crud$numPos %in% intersect(crud$numPos,ci$numPos)] <- ci$Freq
+ ci <- crud
+ rm(crud)
+```
+
+```{r,fig.width = 17, fig.height = 17,echo=FALSE}
+par(mfrow=c(4,4))
+require(scales)
+lwdths <- 2.3
+
+#consecutive positives
+zz <- 1:numTests #range of possible values for consecutive positive tests
+#y <- rep(zz,consecPos$Freq) #values for consecutive positives from data
+
+par(mar=c(5, 7, 4, 2) + 0.1)
+
+xlabl <- 'Consecutive Positive Tests'
+
+plot(cumsum(colSums(dts.ih[,cpnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='Cumulative Colonization Episodes',
+	xlab=xlabl,ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,cex.main=labsiz,main='IH Model',lty=1)
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=alpha('black',.05))
+}
+lines(cumsum(consecPos$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+#x <- rep(zz,colSums(dts.ih[,cpnms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+plot( cumsum(colSums(dts.2cr[,cpnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,cex.main=labsiz,main='2CR Model',lty=1,col='blue') #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=alpha('blue',.05))
+}
+lines(cumsum(consecPos$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed')
+#x <- rep(zz,colSums(dts.2cr[,cpnms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+
+plot(cumsum(colSums(dts.ucc[,cpnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,cex.main=labsiz,main='UCC Model',lty=1,col='red') #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=alpha('red',.05))
+}
+lines(cumsum(consecPos$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+#x <- rep(zz,colSums(dts.ucc[,cpnms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+plot(cumsum(colSums(dts.2S[,cpnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,cex.main=labsiz,main='2S Model',lty=1,col='darkgreen') #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',.05))
+}
+lines(cumsum(consecPos$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+#x <- rep(zz,colSums(dts.2S[,cpnms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+
+#consecutive negatives
+zz <- 1:numTests  #range of values for consecutive positives 
+#y <- rep(zz,consecNeg$Freq) #values from the data for positives; override old value
+xlabl <- 'Consecutive Negative Tests'
+
+plot(cumsum(colSums(dts.ih[,cnnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='Cumulative Susceptible Episodes',
+	xlab=xlabl,ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='black') #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=alpha('black',.05))
+}
+lines(cumsum(consecNeg$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+#x <- rep(zz,colSums(dts.ih[,cnnms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+plot(cumsum(colSums(dts.2cr[,cnnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='blue') #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=alpha('blue',.05))
+}
+lines(cumsum(consecNeg$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+#x <- rep(zz,colSums(dts.2cr[,cnnms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+plot(cumsum(colSums(dts.ucc[,cnnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='red') #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=alpha('red',.05))
+}
+lines(cumsum(consecNeg$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+#x <- rep(zz,colSums(dts.ucc[,cnnms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+plot(cumsum(colSums(dts.2S[,cnnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='darkgreen') #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',.05))
+}
+lines(cumsum(consecNeg$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+#x <- rep(zz,colSums(dts.2S[,cnnms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+#carrier index
+zz <- 0:numTests #range of values for carrier index 
+#y <- rep(zz,ci$Freq) #carrier index values from the data
+
+xlabl <- 'Total Positive Tests'
+
+plot(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),type='l',lwd=lwdths,ylab='Cumulative Individuals',xlab=xlabl,
+	ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='black') #from the Price data
+axis(1, at = seq(0, numTests, by = 3), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cinms]))~c(0:numTests),lwd=lwdths,col=alpha('black',.05))
+  
+}
+lines(cumsum(ci$Freq)~c(0:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+#x <- rep(zz,colSums(dts.ih[,cinms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+
+plot(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),type='l',lwd=lwdths,ylab='',xlab=xlabl,
+	ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='blue') #from the Price data
+axis(1, at = seq(0, numTests, by = 3), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cinms]))~c(0:numTests),lwd=lwdths,col=alpha('blue',.05))
+}
+lines(cumsum(ci$Freq)~c(0:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+#x <- rep(zz,colSums(dts.2cr[,cinms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+plot(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),type='l',lwd=lwdths,ylab='',xlab=xlabl,
+	ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='red') #from the Price data
+axis(1, at = seq(0, numTests, by = 3), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cinms]))~c(0:numTests),lwd=lwdths,col=alpha('red',.05)) 
+}
+lines(cumsum(ci$Freq)~c(0:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+#x <- rep(zz,colSums(dts.ucc[,cinms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+plot(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,200),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='darkgreen') #from the Price data
+axis(1, at = seq(0, numTests, by = 3), las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cinms]))~c(0:numTests),lwd=lwdths,col=alpha('darkgreen',.05))
+}
+lines(cumsum(ci$Freq)~c(0:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+#x <- rep(zz,colSums(dts.2S[,cinms])/maxIters)
+#text(x=8,y=20,label=paste('p=', round(wilcox.test(x,y)$p.value ,2) ,sep='' ) )
+
+```
+
+Grayscale version:
+
+```{r,echo=FALSE}
+par(mfrow=c(4,4))
+#require(scales) #causes problems for eps, which doesn't handle transparencies well
+
+lwdths <- 2.3
+
+labsiz <- 1
+axsiz <- 1
+
+#consecutive positives
+zz <- 1:numTests #range of possible values for consecutive positive tests
+
+#pdf(file='Figure6.pdf',width=7,height=12)
+
+#par(mai=c(1,.6,.2,.05),
+#  omi=c(1,0,.2,0),
+#  mfcol=c(4,3))
+
+xlabl <- 'Consecutive Positive Tests'
+
+plot(cumsum(colSums(dts.ih[,cpnms])/maxIters)~c(1:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Colonization Episodes',
+     xlab=xlabl,
+     ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     cex.main=labsiz,
+     #main='IH Model',
+     lty=1,
+     axes=F)
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=1,las=2)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(consecPos$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+lines(cumsum(colSums(dts.ih[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths)
+
+text(x=-4.4,y=250,"A)",xpd=NA)
+
+
+plot( cumsum(colSums(dts.2cr[,cpnms])/maxIters)~c(1:numTests),
+      type='l',
+      lwd=lwdths,
+      ylab='Cumulative Colonization Episodes',
+      xlab=xlabl,
+      ylim=c(0,200),
+      #xaxt='n',
+      cex.lab=labsiz,
+      cex.axis=axsiz,
+      cex.main=labsiz,
+      #main='2CR Model',
+      lty=1,
+      col='black',
+      axes=F) #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=1,las=2)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(consecPos$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed')
+lines(cumsum(colSums(dts.2cr[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths)
+
+text(x=-4.4,y=250,"D)",xpd=NA)
+
+
+plot(cumsum(colSums(dts.2S[,cpnms])/maxIters)~c(1:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Colonization Episodes',
+     xlab=xlabl,
+     ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     cex.main=labsiz,
+     #main='2S Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=1,las=2)
+
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(consecPos$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+lines(cumsum(colSums(dts.2S[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths)
+text(x=-4.4,y=250,"G)",xpd=NA)
+
+plot(cumsum(colSums(dts.ucc[,cpnms])/maxIters)~c(1:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Colonization Episodes',
+     xlab=xlabl,
+     ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     cex.main=labsiz,
+     #main='UCC Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=1,las=2)
+
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(consecPos$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+lines(cumsum(colSums(dts.ucc[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths)
+
+text(x=-4.4,y=250,"J)",xpd=NA)
+
+
+
+
+#consecutive negatives
+zz <- 1:numTests  #range of values for consecutive negatives 
+#y <- rep(zz,consecNeg$Freq) #values from the data for positives; override old value
+xlabl <- 'Consecutive Negative Tests'
+
+plot(cumsum(colSums(dts.ih[,cnnms])/maxIters)~c(1:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Susceptible Episodes',
+     xlab=xlabl,
+     ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     #main='IH Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=1,las=2)
+
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(consecNeg$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+lines(cumsum(colSums(dts.ih[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths)
+
+text(x=-4.4,y=250,"B)",xpd=NA)
+
+
+plot(cumsum(colSums(dts.2cr[,cnnms])/maxIters)~c(1:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Susceptible Episodes',
+	   xlab=xlabl,
+     ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     #main='2CR Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=1,las=2)
+
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(consecNeg$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+lines(cumsum(colSums(dts.2cr[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths)
+text(x=-4.4,y=250,"E)",xpd=NA)
+
+plot(cumsum(colSums(dts.2S[,cnnms])/maxIters)~c(1:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Susceptible Episodes',
+	   xlab=xlabl,
+     ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     #main='2S Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=1,las=2)
+
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(consecNeg$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+lines(cumsum(colSums(dts.2S[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths)
+text(x=-4.4,y=250,"H)",xpd=NA)
+
+plot(cumsum(colSums(dts.ucc[,cnnms])/maxIters)~c(1:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Susceptible Episodes',
+	   xlab=xlabl,
+     ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     #main='UCC Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = seq(1, numTests, by = 2), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=1,las=2)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(consecNeg$Freq)~c(1:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+lines(cumsum(colSums(dts.ucc[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths)
+text(x=-4.4,y=250,"K)",xpd=NA)
+
+
+
+#carrier index
+zz <- 0:numTests #range of values for carrier index 
+#y <- rep(zz,ci$Freq) #carrier index values from the data
+
+xlabl <- 'Total Positive Tests'
+
+
+plot(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Individuals',
+     xlab=xlabl,
+     ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     #main='IH Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = seq(0, numTests, by = 3), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=0,las=2)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+  
+}
+lines(cumsum(ci$Freq)~c(0:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+lines(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),col='black',lwd=lwdths)
+text(x=-6.3,y=250,"C)",xpd=NA)
+
+plot(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Individuals',
+     xlab=xlabl,
+	   ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     #main='2CR Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = seq(0, numTests, by = 3), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=0,las=2)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(ci$Freq)~c(0:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+lines(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),col='black',lwd=lwdths)
+text(x=-6.3,y=250,"F)",xpd=NA)
+
+plot(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Individuals',
+	   xlab=xlabl,
+     ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     #main='2S Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = seq(0, numTests, by = 3), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=0,las=2)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.85,.85))
+}
+lines(cumsum(ci$Freq)~c(0:numTests),lwd=lwdths,col='black',lty='dashed') #from the Price data
+lines(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),col='black',lwd=lwdths)
+text(x=-6.3,y=250,"I)",xpd=NA)
+
+plot(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Individuals',
+     xlab=xlabl,
+	   ylim=c(0,200),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     #main='UCC Model',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = seq(0, numTests, by = 3), las=1,cex.lab=labsiz,cex.axis=axsiz,pos=0)
+axis(2,pos=0,las=2)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.85,.85)) 
+}
+lines(cumsum(ci$Freq)~c(0:numTests),lwd=lwdths,col='black',lty='dashed')#from the Price data
+lines(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),col='black',lwd=lwdths)
+text(x=-6.3,y=250,"L)",xpd=NA)
+
+
+
+#dev.off()
+```
+# S3.5.2 Simulating Different Study Durations and Test Frequencies
+
+For each combination of study duration and testing frequency we produce 30 simulated data sets and consider the same statistics as above (numbers of consecutive positive tests, negative tests, and total positive tests per individual). We report averages and standard deviations for these quantities in the tables, and in the figures we show averaged ECDFs from the models superimposed over ECDFs from the individual simulations. Increasing the testing frequency for a year-long study does not reveal qualitative differences between the models. A study duration of 5 years is sufficiently long to reveal differences between the 2CR model and th rest, even with monthly testing. Over a 20-year study, the model averages are starting to diverge, with the IH and UCC models predicing a larger group of apparent "persistent" carriers than the other models.
+
+
+```{r,echo=F}
+
+
+getFig9 <- function(numYrs,testFreq,ymax,ymax2,ymax3,ax1=c(1,floor(1:5/5 * round(numTests/5)*5)), ax2=c(0,floor(1:5/5 * round(numTests/5)*5)),legend=F,pltlbs = c('A)','B)','C)','D)'),labxpos=-20){
+#numYrs <- 1
+#testFreq <- 1
+numSubjects <- 181
+
+
+times <- list()
+for(i in 1:numSubjects) times[[i]] <- diff(seq(0,52*numYrs,by=testFreq))
+numTests <- length(times[[1]]) + 1
+
+nm.IH <- paste('sims_IH_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2CR <- paste('sims_2CR_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.UCC <- paste('sims_UCC_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2S <- paste('sims_2S_',numYrs,'yrs_',testFreq,'wks',sep='')
+
+
+load(paste(nm.IH,'.Rdata',sep=''))
+load(paste(nm.2CR,'.Rdata',sep=''))
+load(paste(nm.UCC,'.Rdata',sep=''))
+load(paste(nm.2S,'.Rdata',sep=''))
+
+maxIters <- dim(dts.ih)[1]
+
+
+cinms <- paste('carrier indx=',0:numTests )
+cpnms <- paste(1:numTests,'consecutive positives')
+cnnms <- paste(1:numTests,'consecutive negatives')
+
+lwdths <- 1.5
+labsiz <- 1
+axsiz <- 1
+
+#carrier index
+zz <- 0:numTests #range of values for carrier index 
+
+
+plot(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Individuals',
+     xlab='Total Positive Tests',
+	   ylim=c(0,ymax3),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     main='',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+axis(2,pos=0,las=2)
+
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.75,.75),lty=1)
+  
+}
+lines(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=gray.colors(1,.3,.3),lty=5)
+lines(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=4)
+lines(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=3)
+lines(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=1)
+
+text(x=labxpos,y=250,pltlbs[1],xpd=NA)
+
+
+plot(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Individuals',
+     xlab='Total Positive Tests',
+	   ylim=c(0,ymax3),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     main='',
+     lty=5,
+     col=gray.colors(1,.3,.3),
+     axes=F) #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+axis(2,pos=0,las=2)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.75,.75),lty=5)
+}
+lines(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=1)
+lines(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=4)
+lines(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=3)
+text(x=labxpos,y=250,pltlbs[2],xpd=NA)
+
+plot(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Individuals',
+	   xlab='Total Positive Tests',
+     ylim=c(0,ymax3),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     main='',
+     lty=3,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+axis(2,pos=0,las=2)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.75,.75),lty=3)
+}
+
+lines(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=gray.colors(1,.3,.3),lty=5)
+lines(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=4)
+lines(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=1)
+text(x=labxpos,y=250,pltlbs[3],xpd=NA)
+
+plot(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='Cumulative Individuals',
+     xlab='Total Positive Tests',
+	   ylim=c(0,ymax3),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     main='',
+     col='black',
+     axes=F,
+     lty=4) #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+axis(2,pos=0,las=2)
+
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.75,.75),lty=4) 
+}
+lines(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=gray.colors(1,.3,.3),lty=5)
+lines(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=3)
+lines(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=1)
+text(x=labxpos,y=250,pltlbs[4],xpd=NA)
+
+
+
+
+
+if(legend==T){
+  legend('bottomright',
+         title=expression(underline(Model)),
+         legend=c('IH','2CR','2S','UCC'),
+         col=c('black',gray.colors(1,.3,.3),'black','black'),
+         lty=c(1,5,3,4),
+         lwd=lwdths)
+
+}
+
+}
+
+#pdf(file='Figure9.pdf',width=7,height=12)
+
+par(mfcol=c(4,2),omi=c(0,1,0,1))
+
+getFig9(1,1,550,550,200,ax1=c(1,seq(from=10,to=50,by=10),53), ax2=c(0,seq(from=10,to=50,by=10),53),legend=F)
+getFig9(20,4,2500,2500,200,legend=T,pltlbs=c('E)','F)','G)','H)'),labxpos=-105)
+
+#dev.off()
+
+```
+
+```{r,echo=F}
+
+
+getFigW21 <- function(numYrs,testFreq,ymax,ymax2,ymax3,ax1=c(1,floor(1:5/5 * round(numTests/5)*5)), ax2=c(0,floor(1:5/5 * round(numTests/5)*5)),legend=F,pltlbs = c('A)','B)','C)','D)'),labxpos=-22,labypos=55){
+#numYrs <- 1
+#testFreq <- 1
+numSubjects <- 181
+
+
+times <- list()
+for(i in 1:numSubjects) times[[i]] <- diff(seq(0,52*numYrs,by=testFreq))
+numTests <- length(times[[1]]) + 1
+
+nm.IH <- paste('sims_IH_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2CR <- paste('sims_2CR_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.UCC <- paste('sims_UCC_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2S <- paste('sims_2S_',numYrs,'yrs_',testFreq,'wks',sep='')
+
+
+load(paste(nm.IH,'.Rdata',sep=''))
+load(paste(nm.2CR,'.Rdata',sep=''))
+load(paste(nm.UCC,'.Rdata',sep=''))
+load(paste(nm.2S,'.Rdata',sep=''))
+
+maxIters <- dim(dts.ih)[1]
+
+
+cinms <- paste('carrier indx=',0:numTests )
+cpnms <- paste(1:numTests,'consecutive positives')
+cnnms <- paste(1:numTests,'consecutive negatives')
+
+lwdths <- 1.5
+labsiz <- 1
+axsiz <- 1
+
+#carrier index
+zz <- 0:numTests #range of values for carrier index 
+
+
+plot(c(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='No. Individuals',
+     xlab='Total Positive Tests',
+	   ylim=c(0,ymax3),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     main='',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+axis(2,pos=0,las=2)
+
+#for(sim in 1:maxIters){
+#  lines(c(as.numeric(dts.ih[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.75,.75),lty=1)
+  
+#}
+#lines(c(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=gray.colors(1,.3,.3),lty=5)
+#lines(c(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=4)
+#lines(c(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=3)
+#lines(c(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=1)
+
+text(x=labxpos,y=labypos,pltlbs[1],xpd=NA)
+
+
+plot(c(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='No. Individuals',
+     xlab='Total Positive Tests',
+	   ylim=c(0,ymax3),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     main='',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+axis(2,pos=0,las=2)
+#for(sim in 1:maxIters){
+#  lines(c(as.numeric(dts.2cr[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.75,.75),lty=5)
+#}
+#lines(c(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=1)
+#lines(c(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=4)
+#lines(c(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=3)
+text(x=labxpos,y=labypos,pltlbs[2],xpd=NA)
+
+plot(c(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='No. Individuals',
+	   xlab='Total Positive Tests',
+     ylim=c(0,ymax3),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     main='',
+     lty=1,
+     col='black',
+     axes=F) #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+axis(2,pos=0,las=2)
+#for(sim in 1:maxIters){
+#  lines(c(as.numeric(dts.2S[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.75,.75),lty=3)
+#}
+
+#lines(c(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=gray.colors(1,.3,.3),lty=5)
+#lines(c(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=4)
+#lines(c(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=1)
+text(x=labxpos,y=labypos,pltlbs[3],xpd=NA)
+
+plot(c(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),
+     type='l',
+     lwd=lwdths,
+     ylab='No. Individuals',
+     xlab='Total Positive Tests',
+	   ylim=c(0,ymax3),
+     #xaxt='n',
+     cex.lab=labsiz,
+     cex.axis=axsiz,
+     main='',
+     col='black',
+     axes=F,
+     lty=1) #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+axis(2,pos=0,las=2)
+
+#for(sim in 1:maxIters){
+#  lines(c(as.numeric(dts.ucc[sim,cinms]))~c(0:numTests),lwd=lwdths,col=gray.colors(1,.75,.75),lty=4)
+#}
+#lines(c(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=gray.colors(1,.3,.3),lty=5)
+#lines(c(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=3)
+#lines(c(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col='black',lty=1)
+text(x=labxpos,y=labypos,pltlbs[4],xpd=NA)
+
+
+
+
+
+}
+
+#pdf(file='FigureW21.pdf',width=7,height=12)
+
+par(mfcol=c(4,2),omi=c(0,1,0,1))
+
+getFigW21(1,1,150,150,50,ax1=c(1,seq(from=10,to=50,by=10),53), ax2=c(0,seq(from=10,to=50,by=10),53),legend=F)
+getFigW21(20,4,10,10,5,legend=T,pltlbs=c('E)','F)','G)','H)'),labxpos=-105,labypos=5.5)
+
+#dev.off()
+
+```
+
+
+### 1 Year Study, Monthly Testing
+```{r,echo=FALSE,fig.width = 17, fig.height = 17}
+#specificy the duration and testing frequency for the data you want to plot; need to have previously saved a sim from the previous code chunk with these values for this to work
+#also can customize the y-limits for the plots
+
+getPlots <- function(numYrs,testFreq,ymax,ymax2,ymax3,ax1=c(1,floor(1:5/5 * round(numTests/5)*5)), ax2=c(0,floor(1:5/5 * round(numTests/5)*5))){
+#numYrs <- 1
+#testFreq <- 1
+numSubjects <- 181
+
+
+times <- list()
+for(i in 1:numSubjects) times[[i]] <- diff(seq(0,52*numYrs,by=testFreq))
+numTests <- length(times[[1]]) + 1
+
+nm.IH <- paste('sims_IH_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2CR <- paste('sims_2CR_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.UCC <- paste('sims_UCC_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2S <- paste('sims_2S_',numYrs,'yrs_',testFreq,'wks',sep='')
+
+
+load(paste(nm.IH,'.Rdata',sep=''))
+load(paste(nm.2CR,'.Rdata',sep=''))
+load(paste(nm.UCC,'.Rdata',sep=''))
+load(paste(nm.2S,'.Rdata',sep=''))
+
+maxIters <- dim(dts.ih)[1]
+
+
+cinms <- paste('carrier indx=',0:numTests )
+cpnms <- paste(1:numTests,'consecutive positives')
+cnnms <- paste(1:numTests,'consecutive negatives')
+
+
+par(mfrow=c(4,4))
+require(scales)
+lwdths <- 2.3
+
+
+#consecutive positives
+zz <- 1:numTests #range of possible values for consecutive positive tests
+alphaval <- .15
+ndigts <- 2 #how many digits for rounding p-values?
+
+
+par(mar=c(5, 7, 4, 2) + 0.1)
+
+xlabl <- 'Consecutive Positive Tests'
+
+plot(cumsum(colSums(dts.ih[,cpnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='Cumulative Colonization Episodes',
+	xlab=xlabl,ylim=c(0,ymax),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,cex.main=labsiz,main='IH Model',lty=1)
+axis(1, at = ax1, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=alpha('black',alphaval))
+}
+lines(cumsum(colSums(dts.2cr[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('blue',1),lty=2)
+lines(cumsum(colSums(dts.ucc[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('red',1),lty=2)
+lines(cumsum(colSums(dts.2S[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',1),lty=2)
+
+
+plot( cumsum(colSums(dts.2cr[,cpnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,ymax),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,cex.main=labsiz,main='2CR Model',lty=1,col='blue') #from the Price data
+axis(1, at = ax1, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=alpha('blue',alphaval))
+}
+lines(cumsum(colSums(dts.ih[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('black',1),lty=2)
+lines(cumsum(colSums(dts.ucc[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('red',1),lty=2)
+lines(cumsum(colSums(dts.2S[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',1),lty=2)
+
+
+plot(cumsum(colSums(dts.ucc[,cpnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,ymax),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,cex.main=labsiz,main='UCC Model',lty=1,col='red') #from the Price data
+axis(1, at = ax1, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=alpha('red',alphaval))
+}
+lines(cumsum(colSums(dts.ih[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('black',1),lty=2)
+lines(cumsum(colSums(dts.2cr[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('blue',1),lty=2)
+lines(cumsum(colSums(dts.2S[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',1),lty=2)
+
+
+plot(cumsum(colSums(dts.2S[,cpnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,ymax),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,cex.main=labsiz,main='2S Model',lty=1,col='darkgreen') #from the Price data
+axis(1, at = ax1, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cpnms]))~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',alphaval))
+}
+lines(cumsum(colSums(dts.ih[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('black',1),lty=2)
+lines(cumsum(colSums(dts.2cr[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('blue',1),lty=2)
+lines(cumsum(colSums(dts.ucc[,cpnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('red',1),lty=2)
+
+
+#consecutive negatives
+xlabl <- 'Consecutive Negative Tests'
+zz <- 1:numTests  #range of values for consecutive negatives 
+
+plot(cumsum(colSums(dts.ih[,cnnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='Cumulative Susceptible Episodes',
+	xlab=xlabl,ylim=c(0,ymax2),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='black') #from the Price data
+axis(1, at = ax1, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=alpha('black',alphaval))
+}
+lines(cumsum(colSums(dts.2cr[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('blue',1),lty=2)
+lines(cumsum(colSums(dts.ucc[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('red',1),lty=2)
+lines(cumsum(colSums(dts.2S[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',1),lty=2)
+
+plot(cumsum(colSums(dts.2cr[,cnnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,ymax2),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='blue') #from the Price data
+axis(1, at = ax1, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=alpha('blue',alphaval))
+}
+lines(cumsum(colSums(dts.ih[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('black',1),lty=2)
+lines(cumsum(colSums(dts.ucc[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('red',1),lty=2)
+lines(cumsum(colSums(dts.2S[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',1),lty=2)
+
+plot(cumsum(colSums(dts.ucc[,cnnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,ymax2),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='red') #from the Price data
+axis(1, at = ax1, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=alpha('red',alphaval))
+}
+lines(cumsum(colSums(dts.ih[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('black',1),lty=2)
+lines(cumsum(colSums(dts.2cr[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('blue',1),lty=2)
+lines(cumsum(colSums(dts.2S[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',1),lty=2)
+
+plot(cumsum(colSums(dts.2S[,cnnms])/maxIters)~c(1:numTests),type='l',lwd=lwdths,ylab='',
+	xlab=xlabl,ylim=c(0,ymax2),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='darkgreen') #from the Price data
+axis(1, at = ax1, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cnnms]))~c(1:numTests),lwd=lwdths,col=alpha('darkgreen',alphaval))
+}
+lines(cumsum(colSums(dts.ih[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('black',1),lty=2)
+lines(cumsum(colSums(dts.2cr[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('blue',1),lty=2)
+lines(cumsum(colSums(dts.ucc[,cnnms])/maxIters)~c(1:numTests),lwd=lwdths,col=alpha('red',1),lty=2)
+
+#carrier index
+zz <- 0:numTests #range of values for carrier index 
+
+
+plot(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),type='l',lwd=lwdths,ylab='Cumulative Individuals',xlab='Total Positive Tests',
+	ylim=c(0,ymax3),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='black') #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ih[sim,cinms]))~c(0:numTests),lwd=lwdths,col=alpha('black',alphaval))
+  
+}
+lines(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('blue',1),lty=2)
+lines(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('red',1),lty=2)
+lines(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('darkgreen',1),lty=2)
+
+
+plot(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),type='l',lwd=lwdths,ylab='',xlab='Total Positive Tests',
+	ylim=c(0,ymax3),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='blue') #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2cr[sim,cinms]))~c(0:numTests),lwd=lwdths,col=alpha('blue',alphaval))
+}
+lines(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('black',1),lty=2)
+lines(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('red',1),lty=2)
+lines(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('darkgreen',1),lty=2)
+
+plot(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),type='l',lwd=lwdths,ylab='',xlab='Total Positive Tests',
+	ylim=c(0,ymax3),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='red') #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.ucc[sim,cinms]))~c(0:numTests),lwd=lwdths,col=alpha('red',alphaval)) 
+}
+lines(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('black',1),lty=2)
+lines(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('blue',1),lty=2)
+lines(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('darkgreen',1),lty=2)
+
+plot(cumsum(colSums(dts.2S[,cinms])/maxIters)~c(0:numTests),type='l',lwd=lwdths,ylab='',
+	xlab='Total Positive Tests',ylim=c(0,ymax3),xaxt='n',cex.lab=labsiz,cex.axis=axsiz,main='',lty=1,col='darkgreen') #from the Price data
+axis(1, at = ax2, las=1,cex.lab=labsiz,cex.axis=axsiz)
+for(sim in 1:maxIters){
+  lines(cumsum(as.numeric(dts.2S[sim,cinms]))~c(0:numTests),lwd=lwdths,col=alpha('darkgreen',alphaval))
+}
+lines(cumsum(colSums(dts.ih[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('black',1),lty=2)
+lines(cumsum(colSums(dts.2cr[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('blue',1),lty=2)
+lines(cumsum(colSums(dts.ucc[,cinms])/maxIters)~c(0:numTests),lwd=lwdths,col=alpha('red',1),lty=2)
+
+
+#compare means of each statistic (consecutive positives, negatives, and number of positive tests)
+meandat <- data.frame("Model"=c('IH','2CR','2S','UCC'), 
+                      'Mean' = c(0,0,0,0), 'SD'=c(0,0,0,0))
+
+
+getNumColonizations <- function(datafrm) as.numeric(apply(datafrm[,cpnms], 1, sum))
+getNumSusceptibleEpisodes <- function(datafrm) as.numeric(apply(datafrm[,cnnms], 1, sum))
+
+getMeanConsecPos <- function(datafrm) mean(rowSums(datafrm[,cpnms]/getNumColonizations(datafrm) * 1:numTests))
+getSDConsecPos <- function(datafrm) sd(rowSums(datafrm[,cpnms]/getNumColonizations(datafrm) * 1:numTests))
+
+
+getMeanConsecNeg <- function(datafrm) mean(rowSums(datafrm[,cnnms]/getNumSusceptibleEpisodes(datafrm) * 1:numTests))
+getSDConsecNeg <- function(datafrm) sd(rowSums(datafrm[,cnnms]/getNumSusceptibleEpisodes(datafrm) * 1:numTests))
+
+getMeanTotPos <- function(datafrm) mean( rowSums(datafrm[,cinms]/numSubjects * 0:numTests))
+getSDTotPos <- function(datafrm) sd( rowSums(datafrm[,cinms]/numSubjects * 0:numTests))
+
+meandat.consecpos <- meandat
+meandat.consecpos$Mean <- signif(sapply(list(dts.ih,dts.2cr,dts.2S,dts.ucc), getMeanConsecPos), digits=3)
+meandat.consecpos$SD <- signif(sapply(list(dts.ih,dts.2cr,dts.2S,dts.ucc), getSDConsecPos), digits=3)
+
+meandat.consecneg <- meandat
+meandat.consecneg$Mean <- signif(sapply(list(dts.ih,dts.2cr,dts.2S,dts.ucc), getMeanConsecNeg), digits=3)
+meandat.consecneg$SD <- signif(sapply(list(dts.ih,dts.2cr,dts.2S,dts.ucc), getSDConsecNeg), digits=3)
+
+meandat.totpos <- meandat
+meandat.totpos$Mean <- signif(sapply(list(dts.ih,dts.2cr,dts.2S,dts.ucc), getMeanTotPos), digits=3)
+meandat.totpos$SD <- signif(sapply(list(dts.ih,dts.2cr,dts.2S,dts.ucc), getSDTotPos), digits=3)
+
+
+
+meandat <- cbind(meandat.consecpos,meandat.consecneg[,-1],meandat.totpos[,-1])
+names(meandat) <- c('Model','Consecutive Positive Mean', 'Consecutive Positive SD','Consecutive Negative Mean', 'Consecutive Negative SD','Total Positives Mean','Total Positives SD')
+
+kable(meandat)
+
+}
+
+
+
+
+getPlots(1,4,200,300,200,ax1=c(1,seq(4,13,by=3)),ax2=c(0, seq(1,13,by=3)) )
+
+```
+
+### 1 Year Study, Weekly Testing
+```{r,echo=FALSE,fig.width = 17, fig.height = 17}
+getPlots(1,1,550,550,200,ax1=c(1,seq(from=10,to=50,by=10),53), ax2=c(0,seq(from=10,to=50,by=10),53))
+```
+
+### 5 Year Study, Monthly Testing
+```{r,echo=FALSE,fig.width = 17, fig.height = 17}
+getPlots(5,4,800,800,200)
+```
+
+
+### 5 Year Study, Weekly Testing
+```{r,echo=FALSE,fig.width = 17, fig.height = 17}
+getPlots(5,1,3000,3000,200,ax1=c(1,seq(50,250,by=50)),ax2=c(0,seq(50,250,by=50)))
+```
+
+### 20 Year Study, Biannual Testing
+```{r,echo=FALSE,fig.width = 17, fig.height = 17}
+getPlots(20,26,900,900,200)
+```
+
+
+## 20 Year Study, Monthly Testing
+```{r,echo=FALSE,fig.width = 17, fig.height = 17}
+getPlots(20,4,2500,2500,200)
+```
+
+### S3.5.3 Comparing the Carrier Types
+
+In this section we examine the distribution of the Carrier Type statistic (numbers of persistent, intermittent, and non-carriers) when the testing schedule matches the original study, as well as how the distributions change in response to varying the testing frequency and study duration.
+
+### S3.5.2.1 Simulating the Price Study
+
+Each model produces similar numbers of noncarriers, intermittent carriers, and persistent carriers as the original data. The test times exactly match those of the study by Price et al (many HCW did not provide a test result at every timepoint).
+
+```{r,eval=TRUE,echo=FALSE,message=FALSE,fig.width = 10, fig.height = 3}
+#load('sims_IH.Rdata') #n=30 simulations
+#load('sims_2CR.Rdata')
+#load('sims_2S.Rdata')
+#load('sims_UCC.Rdata')
+
+
+
+#load('dts_Price_ih_data.Rdata') #n=5000 simulations
+#load('dts_Price_2cr_data.Rdata') 
+#load("dts_Price_ucc_data.Rdata")
+
+load("sims_IH_Priceyrs_Studywks.Rdata")
+load("sims_2CR_Priceyrs_Studywks.Rdata")
+load("sims_UCC_Priceyrs_Studywks.Rdata")
+load("sims_2S_Priceyrs_Studywks.Rdata")
+
+axsiz <- 1.8
+labsiz <- 2
+
+par(mar=c(4, 5, 3, 1))
+
+
+lwdths <- 3
+par(mfrow=c(1,3))
+plot(density(dts.ih$never,adjust=1),xlab='Number of HCW',main='Never Test Positive',xlim=c(0,190),ylab='Density',lwd=lwdths,ylim=c(0,0.1),cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+lines(density(dts.2cr$never,adjust=1),col='blue',lwd=lwdths)
+lines(density(dts.ucc$never,adjust=1),col='red',lwd=lwdths)
+lines(density(dts.2S$never,adjust=2),col='darkgreen',lwd=lwdths)
+points(x=82,y=0,pch=19)
+
+plot(density(dts.ih$intermittently,adjust=1),xlab='Number of HCW',main='Intermittently Test Positive',xlim=c(0,190),ylab='',lwd=lwdths,ylim=c(0,0.1),cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+lines(density(dts.2cr$intermittently,adjust=1),col='blue',lwd=lwdths)
+lines(density(dts.ucc$intermittently,adjust=1),col='red',lwd=lwdths)
+lines(density(dts.2S$intermittently,adjust=1),col='darkgreen',lwd=lwdths)
+points(x=67,y=0,pch=19)
+
+plot(density(dts.ih$persistently,adjust=1.5),xlab='Number of HCW',main='Always Test Positive',xlim=c(0,190),ylab='',lwd=lwdths,ylim=c(0,.18),cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+lines(density(dts.2cr$persistently,adjust=1.5),col='blue',lwd=lwdths)
+lines(density(dts.ucc$persistently,adjust=1.5),col='red',lwd=lwdths)
+lines(density(dts.2S$persistently,adjust=1.5),col='darkgreen',lwd=lwdths)
+points(x=32,y=0,pch=19)
+legend("topright", legend=c("IH", "2CR","2S","UCC"),
+       col=c("black","blue","darkgreen", "red"), lty=1, cex=1.1,
+       title=NULL, text.font=4,lwd=lwdths)
+  
+```
+
+```{r,eval=TRUE,echo=FALSE,message=FALSE,fig.width = 4, fig.height = 9}
+#grayscale version
+
+#load('sims_IH.Rdata') #n=30 simulations
+#load('sims_2CR.Rdata')
+#load('sims_2S.Rdata')
+#load('sims_UCC.Rdata')
+
+
+
+#load('dts_Price_ih_data.Rdata') #n=5000 simulations
+#load('dts_Price_2cr_data.Rdata') 
+#load("dts_Price_ucc_data.Rdata")
+
+load("sims_IH_Priceyrs_Studywks.Rdata")
+load("sims_2CR_Priceyrs_Studywks.Rdata")
+load("sims_UCC_Priceyrs_Studywks.Rdata")
+load("sims_2S_Priceyrs_Studywks.Rdata")
+
+pdf(file='Figure8.pdf',width=3.5,height=9)
+
+axsiz <- 1
+labsiz <- 1
+
+par(mfrow=c(3,1),mai=c(.5, .75, .5, .25),family='sans',omi=c(0.1,.5,0.5,0))
+
+
+lwdths <- 2
+#par(mfrow=c(3,1))
+plot(density(dts.ih$never,adjust=1),
+     xlab='No. of HCW',
+     main='',
+     xlim=c(0,181),
+     ylab='Density',
+     lwd=lwdths,ylim=c(0,0.1),
+     cex.axis=axsiz,
+     cex.lab=labsiz,
+     cex.main=labsiz,
+     axes=F)
+axis(side=1,pos=0,at=c(seq(0,150,by=50),181),labels=c(seq(0,150,by=50),181))
+axis(side=2,pos=0,las=2)
+
+lines(density(dts.2cr$never,adjust=1),col='darkgray',lwd=lwdths)
+lines(density(dts.ucc$never,adjust=1),col='black',lty=4,lwd=lwdths)
+lines(density(dts.2S$never,adjust=2),col='black',lty=3,lwd=lwdths)
+points(x=82,y=0,pch=19)
+
+text(x=-100,y=.12,'A)',xpd=NA)
+
+legend('topright',
+       legend=c('IH','2CR','2S','UCC'),
+       col=c('black','darkgray','black','black'),
+       lty=c(1,1,3,4),
+       lwd=lwdth,title=expression(underline(Model)))
+
+plot(density(dts.ih$intermittently,adjust=1),
+     xlab='No. of HCW',
+     main='',
+     xlim=c(0,181),
+     ylab='Density',
+     lwd=lwdths,
+     ylim=c(0,0.1),
+     cex.axis=axsiz,
+     cex.lab=labsiz,
+     cex.main=labsiz,
+     axes=F)
+axis(side=1,pos=0,at=c(seq(0,150,by=50),181),labels=c(seq(0,150,by=50),181))
+axis(side=2,pos=0,las=2)
+lines(density(dts.2cr$intermittently,adjust=1),col='darkgray',lwd=lwdths)
+lines(density(dts.ucc$intermittently,adjust=1),col='black',lty=3,lwd=lwdths)
+lines(density(dts.2S$intermittently,adjust=1),col='black',lty=4,lwd=lwdths)
+points(x=67,y=0,pch=19)
+
+text(x=-100,y=.12,'B)',xpd=NA)
+
+plot(density(dts.ih$persistently,adjust=1.5),
+     xlab='No. of HCW',
+     main='',
+     xlim=c(0,181),
+     ylab='Density',
+     lwd=lwdths,
+     ylim=c(0,.1),
+     cex.axis=axsiz,
+     cex.lab=labsiz,
+     cex.main=labsiz,
+     axes=F)
+axis(side=1,pos=0,at=c(seq(0,150,by=50),181),labels=c(seq(0,150,by=50),181))
+axis(side=2,pos=0,las=2)
+lines(density(dts.2cr$persistently,adjust=1.5),col='darkgray',lwd=lwdths)
+lines(density(dts.ucc$persistently,adjust=1.5),col='black',lty=3,lwd=lwdths)
+lines(density(dts.2S$persistently,adjust=1.5),col='black',lty=4,lwd=lwdths)
+points(x=32,y=0,pch=19)
+text(x=-100,y=.12,'C)',xpd=NA)
+
+dev.off()
+  
+```
+
+```{r,eval=TRUE,echo=FALSE,fig.width = 10, fig.height = 3}
+f <- function(numYrs,testFreq,ymaxn=0.15,ymaxi=0.15,ymaxp=1,legend=FALSE,title=FALSE,adjust1=1,adjust2=1,adjust3=1,adjust4=1){
+  
+nm.IH <- paste('sims_IH_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2CR <- paste('sims_2CR_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.UCC <- paste('sims_UCC_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2S <- paste('sims_2S_',numYrs,'yrs_',testFreq,'wks',sep='')
+
+
+load(paste(nm.IH,'.Rdata',sep=''))
+load(paste(nm.2CR,'.Rdata',sep=''))
+load(paste(nm.UCC,'.Rdata',sep=''))
+load(paste(nm.2S,'.Rdata',sep=''))
+
+lwdths <- 3
+par(mfrow=c(1,3))
+
+par(mar=c(4, 5, 3, 1))
+
+if(title==TRUE){
+  lab1='Never Test Positive'
+  lab2='Intermittently Test Positive'
+  lab3='Always Test Positive'}else{
+    lab1=''
+    lab2=''
+    lab3=''
+    }
+
+
+plot(density(dts.ih$never),xlab='Number of HCW',main=lab1,xlim=c(0,190),ylab='Density',lwd=lwdths,ylim=c(0,ymaxn),cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+lines(density(dts.2cr$never),col='blue',lwd=lwdths)
+lines(density(dts.ucc$never),col='red',lwd=lwdths)
+lines(density(dts.2S$never),col='darkgreen',lwd=lwdths)
+points(x=82,y=0,pch=19)
+
+plot(density(dts.ih$intermittently,adjust=adjust1),xlab='Number of HCW',main=lab2,xlim=c(0,190),ylab='',lwd=lwdths,ylim=c(0,ymaxi),cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+lines(density(dts.2cr$intermittently,adjust=adjust2),col='blue',lwd=lwdths)
+lines(density(dts.ucc$intermittently,adjust=adjust3),col='red',lwd=lwdths)
+lines(density(dts.2S$intermittently,adjust=adjust4),col='darkgreen',lwd=lwdths)
+points(x=67,y=0,pch=19)
+
+plot(density(dts.ih$persistently),xlab='Number of HCW',main=lab3,xlim=c(0,190),ylab='',lwd=lwdths,ylim=c(0,ymaxp),cex.axis=axsiz,cex.lab=labsiz,cex.main=labsiz)
+lines(density(dts.2cr$persistently),col='blue',lwd=lwdths)
+lines(density(dts.ucc$persistently),col='red',lwd=lwdths)
+lines(density(dts.2S$persistently),col='darkgreen',lwd=lwdths)
+points(x=32,y=0,pch=19)
+if(legend==TRUE){
+legend("topright", legend=c("IH", "2CR","2S","UCC"),
+       col=c("black","blue","darkgreen", "red"), lty=1, cex=1.1,
+       title=NULL, text.font=4,lwd=lwdths)
+}
+}
+
+
+h <- function(numYrs,testFreq){
+  
+nm.IH <- paste('sims_IH_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2CR <- paste('sims_2CR_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.UCC <- paste('sims_UCC_',numYrs,'yrs_',testFreq,'wks',sep='')
+nm.2S <- paste('sims_2S_',numYrs,'yrs_',testFreq,'wks',sep='')
+
+
+load(paste(nm.IH,'.Rdata',sep=''))
+load(paste(nm.2CR,'.Rdata',sep=''))
+load(paste(nm.UCC,'.Rdata',sep=''))
+load(paste(nm.2S,'.Rdata',sep=''))
+
+wilcoxDat <- data.frame(
+'IH/2CR'=c(wilcox.test(dts.ih$never,dts.2cr$never)$p.value,
+  wilcox.test(dts.ih$intermittently,dts.2cr$intermittently)$p.value,
+  wilcox.test(dts.ih$persistently,dts.2cr$p.valueersistently)$p.value),
+
+'IH/UCC'=c(wilcox.test(dts.ih$never,dts.ucc$never)$p.value,
+  wilcox.test(dts.ih$intermittently,dts.ucc$intermittently)$p.value,
+  wilcox.test(dts.ih$persistently,dts.ucc$p.valueersistently)$p.value),
+
+'UCC/2CR'=c(wilcox.test(dts.2cr$never,dts.ucc$never)$p.value,
+  wilcox.test(dts.2cr$intermittently,dts.ucc$intermittently)$p.value,
+  wilcox.test(dts.2cr$persistently,dts.ucc$persistently)$p.value)
+  
+)
+
+rownames(wilcoxDat) <- c("Never","Intermittently","Persistently")
+wilcoxDat <- apply(wilcoxDat,c(1,2),function(x) as.numeric(scientific(x,digits=3)))
+
+kable(wilcoxDat,caption='Wilcoxon Rank-Sum Test p-values')
+
+}
+
+#f(1,4,legend=TRUE)
+#h(1,4)
+
+```
+
+### S3.5.2.2 Simulating other Testing Frequencies and Study Durations
+
+Across each model, the proportion of intermittent carriers approaches one as the testing frequency and study duration increase. 
+
+```{r,echo=FALSE,fig.width = 10, fig.height = 3}
+f(1,4,ymaxn=0.1, ymaxi = 0.1, ymaxp=0.3, legend=TRUE,title=TRUE)
+f(1,1,ymaxp = 5)
+f(5,4,ymaxn=.3,ymaxi=.3,ymaxp=2)
+f(5,1,ymaxn=5,ymaxi=2,ymaxp=1.5,adjust1=.1,adjust2=1)
+f(20,26,ymaxn=.3,ymaxi=.3,ymaxp=3)
+f(20,4,ymaxn=1.5,ymaxi=1.2,ymaxp=1.2,adjust1=.05,adjust2=0.05,adjust3=.05,adjust4=.05)
+```
+
+
